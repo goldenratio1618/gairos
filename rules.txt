@@ -1,0 +1,1223 @@
+Chapter 1: Overview
+Intro and Difference from D&D:
+Welcome to the Gairos system. It’s effectively a combination of D&D 5e, D&D 3.5, and things that I (ksedlar) thought of. Sometimes the rules will implicitly assume you have played D&D and mention words like DC, AC, initiative, etc; the same word probably refers to the same thing unless explicitly stated otherwise. The main differences are:
+Characters are mechanically built entirely out of skills and feats. “Attributes” also exist, but only to give modifiers to groups of skills. “Class” exists only as a way of dividing up feats and determining favored skills. “Multiclassing” is easy, but even two characters technically in the same class might have 0 overlap in their chosen feats. While technically the only “classes” are fighter, rogue, mage, and cleric, you can easily replicate other D&D classes in your customization (fighter+cleric = paladin, mage with a bunch of metamagic feats = sorcerer, performance-focused rogue+mage = bard, transformation-focused cleric = druid, etc). 
+Skills matter, a lot. Unlike in 5e, where the difference between proficiency and non-proficiency is tiny compared to the variance of the d20 roll (leading to the barbarian knowing more arcana than the wizard ~25% of the time), skills in the Gairos system are more akin to in 3.5, where someone focusing on a skill can eventually always do better at it than someone who hasn’t trained at all. Also, most everything is determined by a skill — your attack bonus, your initiative bonus, even your HP are all distinct skills. 
+Divine magic is not actually magic anymore. Rather, it’s just praying to the gods. And unlike in 5e, where behaving in “unclericky” ways had no effect, now it’s actually mechanically relevant to follow the gods’ tenants. You can see the Religion section of this doc for various examples, or Religions by Region if your character might adhere to a foreign religion.
+Healing is harder, in many ways. A single long rest won’t heal you to full, and you don’t have hit dice to spend for short rests. If you don’t have some kind of healer in your party, you might be in for a sad time. 
+
+Character Creation and Leveling Up:
+
+Every level, characters gain skill points, health, and mana. Every 4th level, characters get an attribute point, as well as a minor feat. For the other ¾ of levels, players get a major feat. Characters get an additional minor feat at 1st level and an additional attribute point every 8th level (but this point cannot go into the same attribute as the first point). 
+
+Before allocating skill points or choosing feats, characters must decide on what class they are taking that level. Class affects skill point allocation and which feats can be chosen each level. 
+Feat selection and skill point allocation can be done in any order. Much of the time, characters will allocate skill points first, as this will fulfill the prerequisite for certain feats; additionally, characters will learn about certain “forbidden” feats only after their knowledge (lore) bonus is high enough. However, occasionally feats like Major/Minor Expert function better if selected before skill point allocation for a level.
+Health and Mana:
+Health represents your character’s life force and their ability to take damage. Mana represents the mystical energy of your character; it is primarily used for casting spells, but occasionally other uses can be found. Characters get 4 HP per level and 1 mana per level, and they can get more via the associated skills or with certain feats.
+Attributes:
+Attributes are aspects of your character that give a corresponding bonus to certain clusters of skills. For example, if your social attribute is +3, you will have a +3 bonus to both the Perform and Deception skills before you gain any ranks in either skill. When you create your character, divide a 0, 1, 2, and 3 among the attributes. Alternatively, you can use 1, 1, 2, 2; 1, 1, 1, 3; or 0, 2, 2, 2.
+
+There are four attributes:
+Physical - making attacks, being fast or strong
+Constitution - having HP/mana, withstanding different types of strain on your body
+Mental - knowledge, anything magic-based, awareness of the world around you, specific techniques
+Social - interacting with others (people, animals, gods), initiative
+Classes:
+There are four classes, as follows:
+Fighter - Good at many physical and constitution-based skills. Feats are straightforward combat abilities, often ways of getting more attacks. Feats give extra HP.
+Rogue - Good at many different types of skills. Feats are sneakier combat abilities, bardic abilities, ways of dealing more damage with attacks. Feats give extra skill points. Some rogues, unconcerned with the standards of society, engage in the dark arts to augment their abilities, sometimes at the cost of their humanity.
+Mage - Good at mental-based skills. Feats allow more effective magic use. Feats give extra mana. Some mages, feeling constrained by the limits of their magic and mana pool, turn to the dark arts to achieve power at any price.
+Cleric -  Good at a variety of skills, though moreso constitution and social skills. Feats allow more effective beseeching of the gods, improve your luck, and give you supernatural blessings. Feats give forgiveness and humility (defined in the cleric feats section).
+Skills:
+Each level, characters get 7 major skill points and 7 minor skill points. Additionally at 1st level, characters get an extra 2 of each. 
+
+Each level, you can spend skill points to buy ranks in a skill. Major skill points can be spent on any skill, while minor skill points can only be spent on minor skills. You can buy fractional ranks. There are 3 caps on how many ranks you can get:
+Low Cap: Equal to [½ your level] + [½ the levels you have specialized in that skill]. After this, ranks cost 2 points.
+Mid Cap: Equal to [your level]. You cannot buy ranks in bolded skills past this point. For non-bolded skills, ranks after this cost 3 points.
+High Cap: Equal to 2*[your level]. You cannot buy ranks past your high cap.
+
+When the rules talk about ranks in a skill, they only refer to the number of skill points you have allocated to the skill; when the rules talk about your bonus to a skill, that also includes the effect of your attributes. For instance, if you have 3 points in the Mental attribute and 3 ranks in the Evoke Runes skill, your Evoke Runes bonus is +6. Feat requirements always refer to your bonus, not your ranks.
+
+Sometimes your low cap will be a fractional number. If you end up with a fractional rank, it rounds down. However, you can just go past the low cap, buying the first half rank for half a skill point and the second half for a full skill point. For example, if you’re a level 1 mage, your low caps for dodge and Resist Condition are both 0.5, because you aren’t specialized in those skills. You could spend 3 major skill points to get 1 rank in each of them.
+
+Skill points go into a cumulative total pool. As long as your skill ranks are monotonically increasing, you can spend the full skill point pool at each level however you want. This means that if you spend extra skill points in an early level pushing a skill rank past the low/mid cap, those points are “freed” at later levels. For example, a level 1 mage could allocate all their level 1 major skill points to get 2 ranks in Dodge and Resist Condition (low cap at 0.5, mid-cap at 1, so costing 4.5 skill points each). But a level 2 mage would only need to spend 3 skill points for each to maintain those ranks (low cap at 1, mid-cap at 2), and if they took a fighter level after that, it would only cost 2 points each to maintain them (low cap at 2, mid-cap at 3). 
+Feats:
+Feats represent special abilities, talents, or blessings that your character has acquired. Major feats tend to be more impressive than minor feats. Certain feats involving rare techniques or dark arts are unknown to you at the campaign start; at each intrinsic knowledge (lore) bonus from +5 through +18, and again at +50, characters will gain access to additional feats. Other feats may be discovered as characters explore the world.
+
+Chapter 2: Skill and Feat Lists
+Skill List: 
+Skills are described in the form:
+[skill name] - [underlying attribute]; [classes specialized in this skill (F for Fighter, R for Rogue, M for Mage, or C for Cleric)]: skill description
+
+Skill names that are bold cannot get ranks past their mid-cap. Skill names that are italicized automatically fail if you’re wearing armor that you’re not strong enough to comfortably move in (see the Armor section for more details). 
+Major Skills: 
+Melee Weapons - physical; F, R: every bonus in this gives +1 to hit with melee weapons. Every +3 bonus in this gives +1 damage with light weapons. Every +2 bonus in this gives +1 damage with medium weapons. Every +1.5 bonus in this gives +1 damage to heavy weapons.
+Ranged Weapons - physical; F, R: every bonus in this gives +1 to hit with ranged weapons
+Dodge - physical; R, M: every +3 bonus gives +1 AC. “dexterity saves”. Subject to armor restrictions.
+Health Pool - constitution; F, R: each bonus in this gives 2 HP
+Mana Pool - constitution; M, C: every bonus in this gives +1 Mana
+Resist Condition - constitution; F, C: most “constitution saves” from 5e
+Resist Damage - constitution; F, C: ability to succeed on death saving throws when bleeding out, ability to resist injuries from certain effects or from falling to 0 HP, damage reduction from armor
+Resistive Willpower - mental; F, M: “wisdom saves”, avoiding experiencing mental effects
+Evoke Runes - mental; M: successfully cast spells
+Initiative - social; F, R: every bonus in this gives +1 to initiative rolls
+Beseech the Gods - social; C; successfully pray
+Minor Skills: 
+Strength - physical; F, C: Initiating and resisting grapple checks, breaking out of restraints, carrying/pushing heavy weight checks, wearing heavy armor, physically intimidating someone. By default your carrying capacity is equal to 100+10*[strength bonus].
+Athletics - physical; F, R: Climbing, swimming, jumping, acrobatics; determines number of known maneuvers
+Stealth - physical; R: Hiding, moving silently, sleight of hand.
+Endurance - constitution; F, C: resisting shove and knockdown effects, ability to continue doing athletic things for a long time, ability to withstand things that would give the “exhausted” condition
+Resist Pain - constitution; F, M: “concentration checks” and resisting pain-based effects
+Assertive Willpower - mental; M, C: keep control of yourself if you’ve become monstrous or maddened, contested mental checks
+Problem Solving - mental; R, M: unlock doors and chests, disarm traps and devices without triggering them, get hints on puzzles, understand the mechanics of a device or construct, craft mundane items, research information in a library, remember something from your personal history
+Craft Magic Item - mental; M: create your own magic items
+Knowledge (lore) - mental; R, M: know facts about religion, history, culture, current events, dark arts; appraise an item
+Knowledge (magic) - mental; M: know general facts about magic, identify enemy spells, decipher runes; determines number of learned spells 
+Knowledge (biology) - mental; M, R: heal someone normally; brew potions/poisons; identify properties of naturally occurring things, safely extracting poison from a monster (dead)
+Perception - mental; F, R: spot, listen, smell, taste, touch; searching for something
+Charisma - social; R, C: how much people like you, how likely npcs are to be hostile/neutral/friendly, gathering information, how attractive you are, how much “presence” you have in a room; determines number of prepared prayers
+Perform - social; R, C: singing, acting, playing an instrument, speech/debate to persuade someone, intimidating someone, etc
+Sense Motive - social; R, C: comprehend a language you don’t understand, detect lies, understand emotions, or read body language; note that for detecting lies, DC increases with believability of lie
+Deception - social; R, M: disguise yourself, have a lie be believed — note that this doesn’t replace a persuasion check, and that DC increases with absurdity of lie
+Interact with Nature - social; F, C: handling animals, tracking, survival, navigating the wild, not getting lost, locating potion/poison ingredients, safely extracting poison from a monster (dead or alive)
+Feat List:
+Unless otherwise noted, you can only take a feat once. Feats labeled with “magic ability” count as magic for the purpose of divine favor and require you to be touching runes you’ve inscribed at an appropriate location. However, you don’t need to make an evoke runes check to use the ability, and thus you have no need for the typical verbal/somatic spell components.
+
+There is an additional list of feats here, for feats which are not generically available, such as dark arts feats or exotic feats. Talk to the DM before creating a character with these feats.
+General:
+ Major Feats:
+Master of the Minors (any): Gain two minor feats from any class. +1 HP
+Legendary Resistance (any, requires character level 5, +8 dodge, +8 resist condition, +8 resistive willpower): Once per long rest, you may choose to succeed on any dodge, resist condition, or resistive willpower skill check you would otherwise fail. Alternatively, you may succeed on a strength check to break out of a grapple or the restrained condition, or an endurance check to prevent being moved / going prone. You can take this feat multiple times to do so multiple times per long rest, but you can’t take it more than once per 5 character levels past level 5.
+Like a Boss (any, requires +10 initiative, +10 assertive willpower): If you started combat with no allies in the initiative order, then as long as you continue to have no allies in the initiative order, you get two turns per round: one at your initiative roll, and one at your initiative roll minus 10. 
+Legendary Action (any, requires character level 5, +8 initiative): You gain a legendary action. Legendary actions can only be spent while you have fewer allies in the initiative order than you have enemies in the initiative order. Legendary actions can only be used one at a time and only at the end of another creature’s turn. You regain spent legendary actions at the start of your turn. You may use a legendary action to do one of the following:
+Move up to your speed
+Make a single unarmed strike or natural weapon attack
+Interact with an Object
+Make a strength check to escape a grapple / restraints
+Legendary Action II (any, requires character level 10, Legendary Action, +12 initiative): You gain another legendary action. You may spend 2 legendary actions at once to do one of the following:
+Cast a 1-mana spell
+Use a bonus action other than quickening a spell
+Use a special racial action
+Make any skill checks that you would automatically make at the end of your turn.
+Legendary Action III (any, requires character level 15, Legendary Action II, +16 initiative): You gain another legendary action. You may spend 3 legendary actions at once to do one of the following:
+Cast any spell with a target of Self or Touch
+Use an Object
+Practical Healer (any, requires +3 knowledge (biology) bonus): You automatically succeed at stabilizing a creature, even without a healer’s kit. When you do use a healer's kit to stabilize a dying creature, that creature also regains 1 hit point. Additionally, as an action, you can spend one use of a healer's kit to tend to a creature and restore (N+1)d6 hit points, where N increases by 1 for every 3 points you have of knowledge (biology) bonus. Once you’ve done this, that creature can’t regain hit points this way again until it has finished a short rest; additionally, a creature can’t regain hit points this way more than thrice per long rest. +1 HP, +1 minor skill point
+Tough (any):  All current and future class levels become specialized in the health pool skill. You get an extra +2 HP for every level you have or later gain. You can take this feat multiple times.
+Combat Reflexes (fighter or rogue only): You get a number of reactions per round equal to the square root of 2x your athletics bonus, rounded down. +1 HP
+Combat Reflexes II (fighter or rogue only, requires combat reflexes): You may take an extra bonus action each turn. +1 HP, +1 minor skill point
+Mobile (fighter or rogue only, requires +5 athletics): Your movement speed increases by 10 feet. If you have a climb, swim, or fly speed, that increases as well. After an enemy enters within 5 ft of you and ends its turn there, you can move up to half your speed as a reaction. This movement doesn’t provoke opportunity attacks. You can Dash or Disengage as a bonus action. You can make a dodge check instead of a strength check to escape or avoid grapples/restraints. +1 HP, +1 minor skill point.
+Improved Two-Weapon Fighting (fighter or rogue only, requires Multi-attack): While dual-wielding, whenever you make an extra attack during your turn with your main-hand weapon, you may also make an extra attack with your off-hand weapon. Unlocks Dual Reflexes Maneuver. +2 HP, +1 minor skill point
+Take Aim (fighter or rogue only): As a bonus action, you can carefully take aim at a location. While you’re aiming, your next ranged weapon attack attacking a target on that square has +5 to hit, you ignore ½ and ¾ cover, and attacking at long range doesn’t impose disadvantage on your attack rolls. You lose your aim if you move, you stop wielding your weapon, you take aim again, you shoot at a different location, or you become incapacitated or restrained. +2 HP
+Masterful Aim (fighter or rogue only, requires Take Aim): Taking aim now gives +10 instead of +5. Alternatively, you may spend an action (rather than a bonus action) taking aim to get +20 to hit. If you would roll a 1 on a ranged attack roll while you’ve taken aim, reroll it. +2 HP
+Weapon Bond (fighter or mage only, requires +3 knowledge (magic)): Magical Ability (DFP -0.5), runes only needed for bonding ceremony. You can spend 2 mana to perform a special 1 hour bonding ritual with any non-artifact non-sentient weapon. You can instantly dismiss your bonded weapon to an extradimensional space, or use a bonus action to summon it from anywhere to your empty hand. If you are bonded to a non-magical weapon, you may treat it as if it were magical for the purpose of DR, and you may use an action to reform it into any other type of weapon. The bond ends if you die, if you perform the 1-hour ritual on a different weapon, or if you use a 1-hour ritual to break your bond to it. The weapon appears at your feet if it is in the extradimensional space when the bond breaks. You gain access to certain maneuvers that you can use with the bonded weapon. +1 HP, +1 mana. 
+Armor Bond (fighter or mage only, +3 knowledge (magic)): Magical Ability (DFP -0.5), runes only needed for bonding ceremony. You can spend 2 mana to perform a special 1 hour bonding ritual with any non-artifact non-sentient armor. You can instantly dismiss your bonded armor to an extradimensional space, or use a bonus action to transform from mundane clothes into your armor. Your mundane clothes then go into the extradimensional space instead, and you can later use an action to transform back. The first transformation sequence fails if the clothes on your body equipment slot are magical. The bond ends if you die, if you perform the 1-hour ritual on a different set of armor, or if you use a 1-hour ritual to break your bond to it. The armor appears at your feet if it is in the extradimensional space when the bond breaks. You gain access to certain maneuvers that you can use while wearing the bonded armor. +1 HP, +1 mana. 
+Masterful Attunement (fighter or mage only, requires Weapon Bond or Armor Bond): Choose 2 magical ability maneuvers. They cost 1 mana less for you and don’t count against your number of known maneuvers. You may take this feat multiple times, but not multiple times with the same maneuver. When you level up, you may swap out one of these maneuvers. +2 HP
+Mage Slayer (fighter or cleric only): When a creature you can see and hear begins the verbal components of a spell, you can use a reaction to make a melee weapon attack against that creature. For the rest of the turn after you hit a creature with an attack, they must make a resist pain check whenever they attempt to cast a spell (as if they were trying to concentrate during your attack); upon failure, the spell fails. Whenever you cause a creature to make a resist pain check, they have disadvantage on that check, and the check’s DC is determined as if you had dealt twice as much damage. You have advantage on skill checks against spells cast by creatures within 5 feet of you. +2 HP, +1 forgiveness
+Protector (fighter or cleric only): When a creature you can see attacks a target other than you that is within 5 feet of you, you can use a reaction to impose disadvantage on the Attack roll. You must be wielding a shield to do this. Additionally, allies within 5 ft of you may use your shield AC bonus instead of their own. Unlocks Interpose and Bait and Switch maneuvers. +2 HP, +1 humility
+Avenger (fighter or cleric only, requires Protector or Lucky Hit): You have advantage against any enemy that:
+Dealt damage to an ally since the start of their last turn.
+Cast a spell on an ally since the start of their last turn.
+Is concentrating on a spell that affects an ally.
+Against such an enemy, you may use either Interpose or a paladin maneuver once per turn for free. +2 HP, +1 forgiveness. 
+Sentinel (fighter or cleric only): When you hit a creature with an opportunity attack, you may choose to make the creature's speed 0 for the rest of the turn. Creatures provoke opportunity attacks from you even if they take the Disengage action before leaving your reach. When a creature within 5 feet of you makes an attack against a target other than you (and that target doesn't have this feat), you can use a reaction to make a melee weapon attack against the attacking creature. +1 HP +1 humility
+Magical Ambush (rogue or mage only, requires Skulker, +5 knowledge (magic) bonus): All current and future class levels become specialized in the stealth skill. If you are hidden from a creature you can see when you cast a spell on it, the creature has disadvantage on the first saving throw it makes against the spell before the start of your next turn. +1 mana, +1 minor skill point
+Master of Aid (rogue or cleric only, requires +7 charisma): You can use the Help action as a bonus action. Additionally, when you use the Help action to aid an ally in attacking a creature, the target of that attack can be within 30 feet of you, rather than 5 feet of you, if the target can see or hear you. Unlocks Commander’s Strike maneuver. +1 major skill point, +1 humility
+Inspiring Singing II (rogue or cleric only, requires inspiring singing): The die for your inspiring song becomes a d10 instead of a d8. Companions you have sung to may choose to add their die to an attack roll or a major skill check. If they would use the die for a resistive willpower check or for any kind of constitution check, they may roll that die twice and take the higher result. +2 major skill points, +1 humility
+Minor Feats:
+Keen Explorer (any): You have advantage on perception checks, on checks to resist or avoid the effects of traps, and on problem solving checks to lockpick or disable traps. You always know which way is north and what time of the day it is. You automatically get a 20 on problem solving rolls for recalling details of things you’ve seen or heard in the past month. +1 minor skill point
+Maneuverable Armor (any): Your strength bonus is doubled for the purpose of attempting italicized skill checks while wearing armor. Additionally, the Maximum Dodge AC bonus of your armor increases by +2.
+Jack of All Trades (any): Gain a +1 rank to all minor skills below their low cap. +1 minor skill point
+Multi-Disciplinary (any, requires +1 rank in all minor skills): Choose 4 minor skills: 1 that is not a fighter skill, 1 that is not a rogue skill, 1 that is not a mage skill, and 1 that is not a cleric skill. All current and future class levels become specialized in those skills.  +1 HP, +1 mana, +1 minor skill point, +1 humility
+Balanced Abilities (any, must be taken concurrently with ASI when you increment an attribute that isn’t your unique highest): Gain a point in two attributes that you did not increase via this level’s ASI, as long as they also aren’t your unique highest.
+Snap Shot (fighter only or rogue only, requires Point Blank Shot): You may use a ranged weapon to make attacks of opportunity. Additionally, you may trigger the Brace and Riposte Maneuvers with a ranged weapon. +1 HP
+Take 10 (fighter, rogue, or mage only): Rather than rolling for a minor skill check, you can treat the roll as a 10, as long as you are not in initiative. +1 minor skill point
+True Grit (fighter or mage only, requires +3 resist pain or +3 assertive willpower): At the start of your turn, you may make a DC 5 check to ignore the effects of one temporary madness or minor injury for that round (either an assertive willpower check or a resist pain check, respectively) until the start of your next turn. For each time you have previously used this ability on that madness/injury, the DC increases by +5. Unlocks Deny Death maneuver. +1 HP
+War Caster (fighter or mage only): You may cast a spell to make attacks of opportunity. The spell must target only that creature. +1 HP
+War Priest (fighter or cleric only, requires Smiter of Evil): You may use a smiting prayer to make attacks of opportunity. The prayer must target only that creature. +1 HP
+Charmer (rogue or cleric only, requires +4 charisma): You have double advantage on charisma, perform (non-intimidation), or deception checks in a “casual” context (e.g. at a bar, not for business or political negotiations). You also have double advantage on deception checks to pass off a failed social check as a joke. +1 minor skill point
+Inspiring Singing (rogue or cleric only, requires +4 perform bonus): Each day a number of times equal to your perform bonus, you may use a bonus action to sing a song to a companion (not yourself) within 60 ft, granting them a non-stackable d8 which they can add to a minor skill check of their choice within the next 10 minutes. They choose whether to use the die after they see the roll. A creature can only have one inspiring singing die at a time.
+Song of Vitality (rogue or cleric only, requires +4 perform bonus): Once per short rest, if you spend 5 minutes singing a song to up to six of your companions within 60 ft of you (which can include yourself), each of you gains temporary HP equal to ½ of your performance bonus.
+Natural Talent (mage or cleric only): You have advantage on knowledge (biology) and interact with nature checks. Any friendly beast within 15 feet of you (other than yourself) has double advantage on all willpower checks. 
+Fighter:
+Major Feats:
+Great Weapon Fighting (fighter only, requires +5 strength): When you roll a 1, 2, or 3 on a damage die for an attack you make with a heavy melee weapon, you can reroll the die and must use the new roll. Additionally, once per short rest when you hit an enemy with a heavy melee weapon, you may make a DC 20 strength check. If you succeed, you may turn that attack into a critical hit. +2 HP
+Action Surge (fighter only, requires +8 endurance): Once per short rest, you may make a DC 13 endurance check. If you succeed, you may take an extra action on your turn.
+Action Surge II (fighter only, requires Action Surge): You may attempt any number of action surges per short rest, though only one per round. For each surge attempt you take after the first, the DC increases by 5 (e.g. the second one would require a DC 18 endurance check, the third one DC 23, etc). If you fail any of these checks other than the first one, take a level of exhaustion. +1 HP
+Multiattack (fighter only, requires +6 skill bonus with melee or ranged weapons): When you take the attack action, you may make an extra attack, at a -6 attack bonus. If you have at least +12 of the appropriate weapons bonus, you may make a 3rd attack at -12, a 4th attack at -18 if you have +18, etc. Partially unlocks Whirlwind Strike maneuver. You may learn a free minor feat (available to fighters). 
+Rapid Shot (fighter only, requires +5 ranged weapons skill bonus): When you take the attack action with a longbow, you may make an extra attack with that weapon; however, you take -1 bonus to all attacks you make in that action. This can be used in addition to multiattack. +2 HP
+Impeccable Aim (fighter only, requires Masterful Aim): As long as you maintain your aim, the bonuses apply to all your ranged weapon attacks, rather than only your next one. +2 HP
+Point Blank Shot (fighter only): Being within 5 feet of a hostile creature doesn’t impose disadvantage on your ranged attack rolls. You get +2 to attack rolls with ranged weapons when you’re within 30 feet of the target. +2 HP
+Duelist (fighter only): As long as only one creature is within 5 ft of you, you gain +1 to melee attack rolls against them, +1 typeless AC against them, and once per round you may use one of your known duelist maneuvers against them for 1 less mana. +2 HP
+Polearm Master (fighter only, requires +5 strength): When you take the attack action on a turn and attack with a heavy reach weapon, you can use your bonus action to make another attack with the weapon, on a different target—the damage die for this is a 1d4, but it still benefits from the damage bonus to heavy weapons. While you are wielding a reach weapon, you may use the Brace maneuver for free, and it does not count against your number of known maneuvers. +1 HP
+Power Attack (fighter only): Before attacking, you may subtract N from any heavy, medium, or ranged weapon attack roll. If you do, add N to the weapon’s damage and ignore N points of your target’s DR to the attack. Additionally, if you miss by 5 or less, deal N damage to the target anyway. N may not exceed your melee/ranged weapons bonus (as appropriate). Unlocks Pushing Attack maneuver. +2 HP
+Combat Expertise (fighter only): When you take the attack action with a medium or heavy weapon, you may subtract N from all your attack rolls this turn to gain +N untyped AC. This bonus lasts until your next action. N cannot exceed your melee weapons bonus. Unlocks Critical Defense Maneuver. +2 HP
+Shield Master (fighter only, requires +4 strength): If you take the Attack action on your turn, you can use a bonus action to try to shove a creature within 5 feet of you with your shield (their endurance vs your strength)—either back 5 feet or prone. If you aren't incapacitated, you can add your shield's AC bonus to dodge checks. If you are subjected to an effect that allows you to make a dodge check to take only half damage, you can use your reaction to take no damage if you succeed on the check, interposing your shield between yourself and the source of the effect. Additionally, your shield no longer contributes to your dodge or endurance ISDC. Unlocks Knockback maneuver. +2 HP
+Tank (fighter only, requires Shield Master): You now can add 2x your shield’s AC bonus to dodge checks. As a bonus action, you can move into a defensive stance, doubling your shield’s AC bonus and doubling the damage resistance from your armor. Until the end of your next turn, you have movement speed 0, disadvantage on attack rolls, and you can’t take any reactions that don’t require your shield. +4 HP
+Brawler (fighter only): You deal an extra 1d4 damage with your unarmed strikes, improvised weapons, and natural weapons. When you hit a creature with an unarmed strike, natural weapon, or improvised melee weapon, you may use a bonus action to attempt to grapple the target.  You have advantage against targets who are grappled. You can use your action to try to pin a creature grappled by you who is within 5 ft. To do so, make another grapple check. If you succeed, you and the creature are both restrained until the grapple ends. +2 HP
+Reckless Attack (fighter only, requires +6 strength): Before making an attack, you may choose to attack recklessly. Doing so gives you advantage on all melee attacks during this turn, but attack rolls against you have advantage until the start of your next turn. You cannot Sneak Attack while using this ability. +2 HP
+Relentless Endurance (fighter only, requires +10 endurance, +5 resist damage): When you are reduced to 0 hit points but not killed outright, you can drop to 1 hit point instead. You can’t use this feature again until you finish a short rest. +2 HP
+Indomitable Endurance (fighter only, requires relentless endurance, +18 endurance, +10 resist damage): When you drop to 0 HP, you may choose to not fall unconscious. While at 0 HP and conscious, you automatically fail any death saves during your turn, and you have -10 to resist damage checks to prevent injury.
+Battlemaster (fighter only): Choose 2 fighter maneuvers. They cost 1 mana less for you and don’t count against your number of known maneuvers. You may take this feat multiple times, but not multiple times with the same maneuver. When you level up, you may swap out one of these maneuvers. +2 HP
+Great Cleave (fighter only): +3 HP. You learn the Cleave maneuver (it doesn’t count against your known maneuvers), and whenever you use it, you may choose one of the following:
+Reduce the mana cost by 1
+Remove the “once per round” and “no moving in between” restrictions on it.
+
+Minor Feats:
+Lunging Strikes (fighter only, requires +4 athletics): When you make a melee attack on your turn, you may increase the horizontal reach of the attack by 5 ft. +1 HP
+Athlete (fighter only, requires +4 athletics): +5 ft movement speed. You have advantage on athletics checks. You can ignore 5*N feet of fall damage from intentional jumps, where N is your athletics bonus. You can make an athletics check instead of a strength check to escape or avoid grapples/restraints, and you may attempt to escape grapples/restraints as a bonus action. +1 HP
+Blind-Fight (fighter only, requires +7 perception): You gain 5 ft of blindsight. +1 HP
+Sure-Footed (fighter only, requires +3 endurance): You cannot fail endurance checks that would cause you to fall prone. You may stand up from prone for 5 feet of movement, rather than one half. +1 HP
+Unstoppable (fighter only, requires +3 endurance): You ignore difficult terrain, as well as any effects that cause you to cause movement to cost more. Your movement speed cannot be reduced unless you are grappled, restrained, prone, or incapacitated. Unlocks Unstoppable 
+Charge maneuver. +1 HP
+Powerful Presence (fighter only, requires +4 strength): When you would make a Charisma, Performance, or Assertive Willpower check, or if that bonus would set the DC for a check, you may use half your Strength bonus instead. +1 HP
+Reactive Maneuverer (fighter only): You may ignore the “on your turn” text of maneuvers. +1 HP
+
+Rogue: 
+Major Feats:
+Sneak Attack (rogue only): You add 1d6 to your damage rolls against enemies you are attacking sneakily (defined as in 5e). When you make a sneak attack, make a strength check based on the ISDC of your armor; on a failure, you fail to deal any extra sneak attack damage. You may only make one sneak attack per turn. You can take this feat multiple times, but the number of times you take it must not exceed half your level, rounded up. Every odd time you take this feat, also gain a minor feat; every even time you take it, gain a major feat other than sneak attack. (These feats must be available to rogues)
+Master of Sneak (rogue only, requires 5x sneak attack feat): You can use your sneak attack twice per turn, but you can't use your sneak attack against the same target more than once in a turn. +1 major skill point, +1 minor skill point
+Swashbuckler (rogue only): You may use your sneak attack against a creature if you are within 5 feet of it, no other creatures are within 5 feet of you, and you don't have disadvantage on the attack roll. Any enemy you attack with a melee weapon this turn cannot make attacks of opportunity against you for the rest of your turn. Unlocks Bait and Switch maneuver. +2 major skill points, +2 minor skill points
+Improved Unarmed Strike (rogue only): You deal an extra 1d4 damage with unarmed strikes. Additionally, you may treat unarmed strikes as medium melee weapons. When you use the attack action with a staff, light weapon, or unarmed strike on your turn, you may make an unarmed strike as a bonus action. You get +N armor AC, where N is is 2*sqrt[sense motive bonus], rounded down. All of the previous benefits only apply if you are not wearing armor or wielding a shield. +1 major skill point, +1 minor skill point
+Monastic Energy (rogue only, requires Improved Unarmed Strike): You unlock the monk maneuvers. +1 major skill point, +1 minor skill point
+Ki Recovery (rogue only, requires Monastic Energy): After combat, recover ½ of the mana you spent on monk maneuvers. +1 major skill point, +1 minor skill point
+Ki Mastery (rogue only, requires Monastic Energy): Choose 2 monk maneuvers. They cost 1 mana less for you and don’t count against your number of known maneuvers. You may take this feat multiple times, but not multiple times with the same maneuver. When you level up, you may swap out one of these maneuvers. +1 major skill point, +1 minor skill point
+Exploit Weakness (rogue only): When you use a reaction to make an attack and are wielding a finesse weapon, you have advantage on the attack, and you add 1d8 to the damage you deal. Unlocks On Guard maneuver. +1 major skill points, +1 minor skill point
+Strike Where it Hurts (rogue only, requires +9 knowledge (biology)): Your critical range is doubled. (Normally this just means 19s are also criticals, but if they already are, then 17s and 18s are too, etc.) When you crit, you may reroll any of your damage dice (up to once per die). Unlocks Bloodletting Strike maneuver. +1 major skill point, +1 minor skill point
+Ambusher (rogue only, requires +6 to initiative skill bonus): You have advantage on attacks against enemies that haven’t acted yet in combat. When you attack an enemy that hasn’t acted yet in combat, ignore their dodge bonus to AC, and treat a 19 on the attack roll as a critical hit. Unlocks Ambush maneuver. +1 major skill point, +1 minor skill point
+Major Expert (rogue only): Gain an instance of the Minor Expert feat. Pick a non-bolded skill. Your skill caps for it are permanently doubled from what they otherwise would be. You can take this feat multiple times, but only for distinct skills. +1 major skill point
+Disruptive Song (rogue only, requires +5 perform bonus): +2 major skill points, +2 minor skill points. You may use a bonus action to sing one of the following songs. The song lasts for one minute or until you stop singing. You can sing at one of 3 volumes: quiet (10’ radius), normal (30’ radius), or loud (60’ radius) and switch between them as a bonus action. DCs are set to 8 + your performance bonus. All targets that can hear you take the song’s effects. 
+Siren’s Song: A luring ballad of temptation and sin. If a living creature who can hear your song attempts a beseech the gods check, they must first make a resistive willpower check. If they fail, they automatically get a 1 on their roll for beseeching the gods (and they can’t reroll this).
+Distracting Song: A catchy and annoying earworm. If a creature attempts a resist pain check to maintain concentration on a spell, they must first make a resistive willpower check. If they fail, they automatically get a 1 on their resist pain roll.
+Danceable Song: An upbeat tune that makes it hard to stay still. If a creature attempts a stealth check to hide, or attempts to take aim with a bow, they must first make a resistive willpower check. If they fail, they automatically get a 1 on their stealth check / they fail to take aim.
+Uncanny Dodge (rogue only, requires +8 dodge bonus): When an attacker that you can see hits you with an attack, you can use a reaction to halve the attack's damage against you. +1 major skill point, +1 minor skill point
+Evasion (rogue only, requires +10 dodge bonus, Uncanny Dodge): Whenever you would succeed on a dodge check to take half damage, you instead take no damage. Whenever you would fail, you instead take half damage. +1 major skill point, +1 minor skill point
+Skulker (rogue only, requires +5 stealth bonus): You have advantage on stealth checks. You can take the Hide action as a bonus action. You can try to hide when you are lightly obscured from the creature from which you are hiding (e.g. > 15 ft away merely in dim light when it doesn’t have darkvision, behind an ally, etc, though note as normal that you will no longer be hidden if the creature moves to a position where you are in plain sight). When you are hidden from a creature and miss it with a ranged weapon attack, making the attack doesn't reveal your position. Dim light doesn't impose disadvantage on your perception checks. +1 major skill point, +1 minor skill point
+Poison Mastery (rogue only, requires Toxin Expert): You are able to get 5x as many doses from a single vial of poison. You can apply poison to a weapon/ammunition as a bonus action instead of as an action. +1 major skill point, +1 minor skill point
+Thief’s Reflexes (rogue only, requires +20 initiative bonus, Quick Thinker): You can take two turns during the first round of any combat. You take your first turn at your normal initiative and your second turn at your initiative minus 20. You can't use this feature when you are surprised. +1 major skill point, +1 minor skill point
+Master of Tactics (rogue only): Choose 2 rogue maneuvers. They cost 1 mana less for you and don’t count against your number of known maneuvers. You may take this feat multiple times, but not multiple times with the same maneuver. When you level up, you may swap out one of these maneuvers. +1 major skill point, +1 minor skill point
+Improved Provoke (rogue only, requires +5 perform): 
++1 major skill point, +1 minor skill point. You learn the Provoke maneuver (it doesn’t count against your known maneuvers), and whenever you use it, you may choose one of the following:
+Reduce the mana cost by 1
+Target all enemies within 60 ft of you, rather than a single enemy. 
+Make it last 1 minute, rather than 1 round
+
+Minor Feats:
+Master of Deceit (rogue only, requires +4 deception or sense motive): For deception and sense motive checks, treat a roll of 7 or lower on the d20 as an 8. +2 minor skill points
+Devious Improviser (rogue only): You may use the Devious Trap or Devious Fling maneuvers for free, and they don’t count against your number of known maneuvers. +1 minor skill point
+Fast Hands (rogue only): You can take up to 3 “Interact with an Object” actions per turn. As a bonus action, you may disarm a trap, open a lock, or drink/administer a potion. +1 minor skill point
+Minor Expert (rogue only): Pick a non-bolded minor skill. Your skill caps for it are permanently doubled from what they otherwise would be. You can take this feat multiple times, but only for distinct skills.
+Insightful Fighting (rogue only, requires +4 sense motive): As a bonus action, you make a Sense Motive check against a creature you can see that isn’t incapacitated, contested by the target’s Deception. If you succeed, you can use your Sneak Attack against that target even if you don't have advantage on the attack roll, but not if you have disadvantage on it. This benefit lasts for 1 minute. +2 minor skill points.
+Underhanded Striker (rogue only): Having a single level of disadvantage on an attack roll no longer prohibits you from using sneak attack. +2 minor skill points.
+Insightful Observer (rogue only, requires +4 perception and +4 sense motive): If you observe a creature appropriately for sufficient time (e.g. 1 minute swordfighting -> melee weapons, 5 minutes watching them walk -> stealth, 10 minutes arguing -> persuasion or assertive willpower, 1 hour crafting -> craft magic item, 1 normal day -> any unbolded social skill, 1 normal week -> uncommon things like resist damage), you can determine their exact numerical level or skill bonus. Note that any creature can choose to intentionally downplay its abilities if it’s wary of observation. +1 minor skill point
+Toxin Expert (rogue only, requires +6 knowledge (biology)): When you apply poison to a light melee weapon, you can apply the poison to a second such weapon at the same time, using the same dose. With your careful treatment, poison on a weapon or ammunition remains potent for 5x as long as normal. +1 minor skill point
+Quick Thinker (rogue only, requires +10 initiative bonus): After rolling initiative but before the first turn of combat, you can choose to swap places in the initiative order with one creature you can see. This ability fails if you try to swap with a hostile creature whose initiative bonus is higher than yours (but you could try again with a different creature). If the creature is one of your allies, that ally must agree to swapping initiative with you.
+Mixed Attacker (rogue only): You can stow weapons as a free action. You may use your ranged weapons bonus in place of your melee weapons bonus when attacking with a finesse weapon. Upon taking this feat, you may transfer any number of skill points from melee weapons to ranged weapons. +1 minor skill point
+Mage:
+Note: All feats labeled “metamagic” determine their cost AFTER any mana reduction is applied to a spell, and round costs up. E.g. if a 2 mana spell would be free via Wizard Adept, you’d be able to apply any metamagic to it for free. Metamagic also multiplies with itself, e.g. two 2x cost multipliers results in a 4x cost multiplier. Rounding happens after all multipliers. Metamagic by default cannot be used on the same spell as other metamagic, though there are several exceptions. Anything that refers to X-mana spells is referring to the base spell cost, and cost reduction does not affect difficulty of evoke runes checks. 
+Major Feats:
+Bond of Insight (mage only, requires Creature Bond): You can communicate telepathically with your familiar and perceive through your familiar's senses as long as you are on the same plane of existence. Additionally, while perceiving through your familiar's senses, you can also speak through your familiar in your voice, have it cast spells, and have it make attacks. Having your familiar take any action of this type consumes your action. Finally, when your familiar takes the Help action to aid in attacking a creature, the target of that attack can be within 30 feet of it, rather than 5 feet of it, if the target can see or hear it. +2 mana
+Fierce Guardianship (mage only, requires Creature Bond): After a short rest, you may cause your familiar to gain temporary HP equal to your Knowledge (Magic) modifier. Your familiar’s attacks count as magical for the purpose of overcoming DR. Your familiar can make attacks of opportunity, and you may use a bonus action to enable your familiar to make an attack on its turn, even if it normally couldn’t. Additionally, your familiar may attack freely if you are incapacitated. When your familiar takes damage, you may use a reaction to grant it DR 5 against that damage. +1 mana
+Mystic Meditation (mage only): Twice per day when you take a short rest, you may recover ½ of your missing mana, rounded up (e.g. if you have 7/10 mana and you take a short rest, you would recover 2 mana). You may learn a free minor feat (available to mages).
+Mana Drain (mage only, requires +5 knowledge (magic)): You may spend 10 minutes holding an unbound mana source and focusing upon it. This causes you to absorb all its mana and use it to recover your own mana. (Note that mana sources tend to replenish their mana each day.) +1 mana
+Ghostly Flicker (mage only, requires Turn to Mist): Magical ability (DFP -0.5), RC 2. As a reaction when you are targeted by an attack you can see, you may spend 1 mana to teleport 5 feet away. Roll a d20. On a roll of 11 or higher, the attack automatically misses, and you teleport 5 feet. Otherwise, the attack is made as normal and you teleport 5 feet shortly after. +2 mana
+Cloak of Invisibility (mage only, requires +6 stealth): Magical ability (DFP -1.5), RC 2. When you successfully Hide yourself from all hostile creatures and you are in darkness or dim light, you may also spend 1 mana to make yourself invisible. This invisibility is broken if you attack, pray, cast a spell, or use a magical ability. It also breaks if you fall unconscious. +1 mana
+Wizard’s Retort (mage only): Magical ability (DFP -1.5), RC 2. All current and future class levels become specialized in the perform skill. As a reaction when you save against an enemy spell/ability or when they miss you with an attack, you may magically viciously mock them. If the target can hear you, they must make a resistive willpower check, with DC 8 + your perform bonus. On a failure, they take 1d4 psychic damage and until the end of their next turn, they have disadvantage on all attack rolls they make and you have advantage on all saving throws they would impose on you. +1 mana
+Elemental Blast (mage only, requires +6 knowledge (magic)): Choose an elemental damage type (fire, cold, lightning, acid, or sonic). Whenever you roll damage of the chosen type, reroll any 1s. If you chose:
+Fire: whenever you deal fire damage to a creature, it ignites (taking 1d4 fire damage at the start of its turns and becoming unable to hide or become invisible). This lasts until it spends an action extinguishing the fire. 
+Cold: whenever you deal cold damage to a creature, it must make a resist condition check against your spell DC or have its speed set to 0 until the end of its next turn. 
+Lightning: whenever you deal lightning damage to a creature, it loses half its reactions (rounded up) until the start of its next turn. 
+Acid: whenever you deal acid damage to a creature, it takes an extra quarter of that damage at the end of its next turn. 
+Sonic: whenever you deal sonic damage to a creature, it must make an endurance check against your spell DC or be knocked prone.
+This can be taken multiple times with different elements. +1 mana
+Arcane Savant (mage only, requires +8 knowledge (magic)): Choose an elemental damage type. Spells or magical abilities with that element in their runes cost half as much mana. Additionally, your spells and attacks ignore damage resistance to the chosen type. You may toggle the latter property on or off after a short rest. This can be taken multiple times with different elements. +1 mana
+Counterspell (mage only, requires +7 knowledge (magic) bonus): Magical ability (DFP -0.5), no runes necessary. If you succeed on a knowledge (magic) check to identify the spell an enemy is casting within 60 ft of you, you may use a reaction to attempt to counter it. To do so, make a contested assertive willpower check with the enemy — if you succeed, you then may spend an amount of mana. This amount is equal to the normal cost of the spell, multiplied when it uses Spell Blast, Temporal Mastery, Apex of Power, or Power Surge, but ignoring any other cost-altering effects. If you do so, counter that spell. +1 mana
+Twincast (mage only, requires +12 knowledge (magic) bonus): Metamagic. When you cast a non-AoE spell that targets exactly one creature and doesn’t have a range of self, you can spend 2x the mana to get a free copy of the spell targeting a second creature in range. If the spell doesn’t require an attack or skill check to save, you may instead spend 3x to get two free copies (targeting three creatures total). +1 mana
+Spell Blast (mage only, requires +5 knowledge (magic) bonus): Metamagic. You may spend 1.5x the mana to double the radius of any AoE spell (or double the edge length of an AoE cube, or 4x the length of a wall effect, etc). Alternatively, you may spend 3x the mana to triple the radius (or otherwise linearly 9x the area), or 5x the mana to quadruple radius (16x area). +1 mana
+Temporal Mastery (mage only, requires +5 knowledge (magic) bonus): Metamagic. When casting a spell, you may spend 2x the mana to increase its duration by a single time category: 1 round->1 minute->10 minutes->1 hour->8 hours->24 hours->1 week->1 month. If the original duration of the spell was < 24 hours, the spell ends after you finish a long rest. This may be used with other types of metamagic. +1 mana
+Quicken (mage only, requires Temporal Mastery): Metamagic. You may spend 2x the mana for a spell to cast it as a bonus action, rather than an action. You can only quicken spells of mana cost N or less, where N is [evoke runes bonus]/6.  +1 mana
+Delay (mage only, requires Temporal Mastery): Metamagic. You may cast a “delayed” version of a spell by spending 1.25x the mana. A delayed spell is similar to a readied spell, in that it takes your concentration and uses your reaction to trigger. However, a delayed spell can be maintained for up to 10 minutes, and spells can be delayed outside of initiative.  Maintaining a delayed spell requires your action, but can be done even if surprised. This may be used with other types of metamagic. +2 mana
+Spellshift (mage only, requires +4 knowledge (magic) bonus): Metamagic. When rolling damage for a spell, you may spend an extra half the mana cost to be able to reroll any number of damage dice involved in it. This ability can only be used once on each damage dice. (Limit one use per spell). +1 mana
+Apex of Power (mage only, requires +8 knowledge (magic) bonus, requires Spellshift): Metamagic. Thrice per short rest, you may pay 1.5x the mana when casting a spell to take the maximum dice value, rather than rolling damage dice. +1 mana
+Force of Will (mage only, requires +6 assertive willpower bonus): Metamagic. If a target would succeed on a resistive willpower check to resist your spell’s effect, you may spend an extra half the mana cost of the spell to make a contested assertive willpower check with the target. If you succeed, the target must reroll the resistive willpower check, this time with disadvantage. (Limit one use per spell). +1 mana
+Power Surge (mage only, requires +15 knowledge (magic) bonus): Metamagic. When casting a spell, you may spend 2x the mana to roll the double the damage dice. Whenever it deals damage to another creature, you take ¼ of that damage. You can only power surge spells of mana cost N or less, where N is ([evoke runes bonus]/3)-1. +1 mana
+Spell Burst (mage only, requires +16 knowledge (magic) bonus, requires 4 metamagic feats): You may use any number of metamagic abilities on the same spell (though a given feat still does not stack with itself). +3 mana
+Balance of Power (mage only, requires +12 knowledge (magic), +8 problem solving): The first time each day you cast a spell, it costs ½ as much mana. Evoke Runes checks to cast unlearned spells are DC 10+3m, rather than 20+3m. +2 mana
+Mystic Confluence (mage only, requires +6 assertive willpower): You may maintain concentration on multiple spells at the same time. When you cast a concentration spell while already maintaining concentration, make an assertive willpower check. This check is equal to the sum of the difficulty DCs of that spell and the previous concentration spells. The difficulty DC for a spell is:
+ 2 by default, 
++1 for each point of RC
+-3 if the spell is a twincast/triplecast/telekinesis copy of a previous concentration spell, or -1 if a regular copy of a previous concentration spell 
+If you fail, you may drop concentration on previous spells until the new spell would succeed; otherwise, the new spell fails (consuming the mana). When you would make a resist pain check to maintain concentration, make a check for each spell separately, and make an additional assertive willpower check as if you had to cast a new 0 difficulty DC spell (dropping spells if that would fail).  +1 mana
+Apprentice Wizard (mage only, requires +5 knowledge (magic) bonus): Choose 3 one-mana spells that you can cast. You can cast them without paying their mana cost, and they don’t count against your number of learned spells. You can swap out one of the chosen spells from {Apprentice Wizard, Wizard Adept, Master Wizard} at level ups. +1 mana
+Wizard Adept (mage only, requires +10 knowledge (magic) bonus, requires Apprentice Wizard): Choose 2 one-mana spells that you can cast. You can cast them without paying their mana cost. Choose 4 two-mana spells that you can cast. You can cast them for one less mana. None of the 6 selected spells count against your number of learned spells. +2 mana
+Master Wizard (mage only, requires +15 knowledge (magic) bonus, requires Wizard Adept): Choose 3 three-mana spells that you can cast. You can cast them for two less mana. Choose 2 of the reduced-cost two-mana spells you chose in the Wizard Adept feat. You can cast them without paying their mana cost, and they don’t count against your number of learned spells.. +1 mana
+Minor Feats:
+Creature Bond (mage only): Magical Ability (DFP -0.5), runes only needed for first summoning. You gain a familiar (as of one casting of the 5e summon familiar spell, with some exceptions). If your familiar reaches 0 HP, it disappears and you take damage equal to your level+1; however, you can resummon it after a long rest. Alternatively, you can summon a different familiar by permanently dismissing your current one, then performing an hour-long ritual that consumes 3 mana (RC 10). 
+You can also find a tiny or smaller creature and convince it to be your familiar (or as close as you can get, if the creature is unintelligent).  If so, it can become your familiar if you bond with it during the ritual you would cast as if you were summoning a new familiar. Unlike a regular familiar, this familiar does not disappear when it reaches 0 HP — rather, it starts bleeding out and making Resist Death checks as if it were a PC. Additionally, it may use the attack action. Beware that intelligent ones may act independently of your commands. 
+Deny the Divine (mage only, requires Counterspell): Magical ability (DFP -2.5), no runes necessary. You may counter prayers just as the Counterspell feat lets one counter spells, except that identifying a prayer is a knowledge (lore) check. Additionally, as a bonus action, you may attempt to dispel any number of ongoing prayer effects from a target within 120 ft of you. For each effect, make an assertive willpower check with DC equal to the normal DC of the prayer; if you succeed, you may spend 1 mana to dispel that effect.
+Spell Contortion (mage only, requires +5 knowledge (magic) bonus): Metamagic. When you cast an AoE spell, you may choose any number of creatures you can see and spend 1.5x the mana to exclude them from it. They automatically succeed on their initial checks against your spell, and they take no damage if they would normally take half damage on a successful check. This may be used with other types of metamagic.
+Prodigal Sorcerer (mage only, requires +6 knowledge (magic) bonus): You have advantage on craft magic item, problem solving, and knowledge (magic) checks.  Your knowledge (magic) bonus counts 2x towards your number of learned spells.
+Supreme Will (mage only, requires +4 assertive willpower): You gain advantage on assertive willpower and resist pain checks. You automatically succeed on resist pain checks from using the same runes in quick succession, casting from tattooed runes, or from having tattooed enchantments on yourself.
+Mage’s Guile (mage only, requires +7 stealth bonus, +7 assertive willpower bonus, +7 knowledge (magic) bonus): You do not need to make any additional skill check when casting spells without verbal components or where the runes are touching a part of your body other than your hands. You can cast a spell while talking, moving, etc (though the action economy stays the same). Additionally, for spells that require a target, you can indicate the target with subtler gestures than pointing (e.g. using pointing with a weapon or gesturing with an open hand instead of a finger). Note that if your spell produces a visible effect before it finishes, it can still be counterspelled after you have already cast it, though it will be harder to identify. +1 mana
+Accumulated Knowledge (mage only, requires +3 knowledge (any)): You have double advantage on knowledge checks (of any kind). All current and future class levels become specialized in all knowledge skills. +1 mana
+Muddle the Mixture (mage only, requires 2 metamagic feats): When you use multiple metamagics on the same spell, ignore the lowest mana multiplier. Alternatively, the first time you would pay extra mana to activate a metamagic feat after first casting a spell with a single metamagic already applied, you may ignore that mana cost.
+Turn to Mist (mage only, requires +5 knowledge (magic)): Magical ability (DFP -0.5), RC 2. Once per short rest, you may spend a bonus action to vanish into silvery mist, teleporting up to 30 feet to an unoccupied space you can see.
+Telekinesis (mage only, requires +4 stealth): +1 mana. Magical ability, RC 3, DFP -0.5. As a bonus action, you can summon an invisible, floating hand somewhere within 30 feet of you. The hand lasts for one hour or until you dismiss it as a bonus action. The hand vanishes if it is ever more than 30 feet away from you. You can use a bonus action to control the hand. The hand can't Attack, activate magical items, or carry more than 10 pounds. You can move the hand up to 30 feet each time you use it. Doing any task unnoticed requires a stealth check. You can create multiple hands at once, but each distinct instance after the first requires concentration as a concentration spell would. You can use the hand to: 
+manipulate an object
+open an unlocked door or container 
+use thieves' tools to pick locks and disarm traps (requires problem solving check)
+stow or retrieve an item from an open container, including one worn/carried by another creature
+pour the contents out of a vial 
+Illusionist’s Stratagem (mage only, requires +4 Problem Solving, +4 Knowledge (Magic)): You can design custom illusion spells, complete with motion, sound, smell, and temperature (though not enough to cause damage). Such a spell costs 1 mana, has RC 6, has DFP -1, has range 120 feet, lasts 10 minutes, has AoE up to a 20 foot cube, and requires concentration. It takes you 10 minutes to design such a spell and write it up on parchment, but you can cast such spells as if they were learned spells for you. The appearance/properties of the illusion must be determined at the time of spell writeup, but while concentrating on the spell, you may use an action to control its movement and sound. Things can pass through the illusion, and a creature can use an action to make a Perception check against your spell DC to identify it as illusory. +1 mana
+Archmage’s Charm (mage only): Pick a spell. You can cast it for half as much mana, and it doesn’t count against your number of learned spells. You can switch out the chosen spell on level ups, but you can only take this feat once.
+
+Cleric:
+Note: Some cleric feats give “forgiveness” or “humility”. For each point of forgiveness, you may ignore one point of divine favor penalty incurred from sinful actions. This does not give you any divine favor bonus; it only removes penalties from sinful acts. Additionally, if you have insufficient mana to pray, you can spend 2 forgiveness per mana you need; this causes any divine favor penalties you have to reapply as appropriate. You regain spent forgiveness on a long rest. If you have N points of humility, then N times per day you may halve your modifier (from skill, divine favor, etc) on your beseech the gods check in order to not spend mana on that prayer.
+
+As a special case, cleric feats affecting dice rolls do NOT apply to Craft Magic Item checks.
+Major Feats:
+In Tune With The Gods (cleric only): At any given point, you know how much divine favor you have, and you are aware of how various actions you take have changed your divine favor. Whenever you would roll less than a 6 on a d20 when attempting one of your prepared prayers, you may reroll that result. If you still fail the check, you regain any humility you spent on it, as well as half the prayer’s mana, rounded up. You get a free minor feat (available to clerics).
+Holy Plea (cleric only, requires In Tune with the Gods, +5 Perform): Once per short rest, you may take +7 on a beseech the gods check. +3 humility. 
+Shared Blessings (cleric only, requires In Tune with the Gods): Non-healing blessing prayers that target a creature may be done as a bonus action, provided they don’t have an extended prayer time. When you successfully pray for a blessing targeting yourself or your weapon, you may also apply the same effects to up to two other targets who you are touching. +2 humility
+Luck of the Devout (cleric only, requires In Tune with the Gods): [Charisma bonus] times per short rest, you may choose to roll a beseech the gods check with advantage. +2 humility
+Bottled Luck (cleric only, requires BtG bonus of +5): You may choose to take disadvantage on a skill check. If you do, then for the next minute, the next check you make using that skill has advantage. Alternatively, you may take disadvantage on an attack roll. If you do, then for the next minute, the next attack you make using that skill has advantage. +1 humility, +1 forgiveness
+Fortune over Finesse (cleric only, requires two of Luck of the Devout, Bottled Luck, Small Fortunes, Precognition): Thrice per short rest, for every +10 bonus you have in a skill, you may choose to negate that bonus on a skill check to instead roll an extra d20. Any advantage or disadvantage on the check applies to ALL d20s involved. +1 humility, +1 forgiveness
+Miracle Worker (cleric only, requires Bottled Luck): Whenever you roll a 20 on a die while making a skill check, you may take a -10 penalty on that check. If you do, roll another d20 for that check. Any advantage or disadvantage on the check applies to ALL d20s involved. +1 humility, +1 forgiveness
+Divine Restoration (cleric only): Twice per day after you finish a short rest, you may make a beseech the gods check. You regain mana equal to ⅓ of the numerical result, rounded up. You also regain 1d4 humility. +2 humility
+Inspired by the Gods (cleric only, requires BtG bonus of +3): Once per short rest, you may reroll a die for ANY roll made by any character you can perceive, including yourself, allies and enemies. +2 forgiveness, +1 humility
+Portent (cleric only, requires Inspired by the Gods): At the end of each long rest, roll two d20s and record the results. At any point during that day, you may replace a d20 that would be rolled by any character you can perceive with the results of one of your portented d20s (using up that portented d20). +2 humility
+Precognition (cleric only, requires Inspired by the Gods, BtG bonus of +6): You gain short-term precognition. Mechanically, this means that once per short rest, you may effectively turn back time: to the beginning of the turn after the first turn in initiative starts, or back 6 seconds if not. Only you are aware of what would have happened in that brief period of time. +1 forgiveness, +1 humility
+Eyes of the Divine (cleric only, requires Inner Light, requires BtG bonus of +12): You gain 120 ft of truesight. You are immune to blindness. +1 forgiveness, +2 humility
+Small Fortunes (cleric only): If you would ever roll a 1 on ANY d20, reroll it. Once per short rest, if someone else you can perceive rolls a 1 on a d20, you may reroll it. +1 forgiveness, +1 humility
+Shifting Fortunes (cleric only, requires Small Fortunes or Inspired by the Gods): Whenever you reroll ANY die, you may roll an additional d6 and either add or subtract it from the resulting number. Limit once per result. +1 forgiveness, +1 humility  
+Holy Healer (cleric only, requires BtG bonus of +5): Healing prayers increase the dice size, if applicable, by one level (e.g. d6 to d8), and you don’t spend additional mana when you overpray for them. Healing Touch prayers to stabilize or restore 1 HP to someone who is at 0 HP cost 0 mana, automatically succeed, and may be done as a bonus action. +2 humility
+Smiter of Evil (cleric only, requires BtG bonus of +5): Before you make a smiting prayer, you may increase its DC by 5; if you succeed, you add another damage die of each applicable damage type. This can stack up to four times. Smiting prayers cost half as much mana, rounded down. When you defeat an evil-aligned creature such as an undead or fiend, you recover all the mana and humility you spent smiting it (either via prayer or maneuver). +2 humility
+Radiant Return (cleric only, requires Smiter of Evil, Shifting Fortunes): After you fail a smiting prayer during combat, you may recover all humility/mana spent on that prayer. Then, for the next smiting prayer that you make before the end of your next turn, you may reroll ANY dice associated with that prayer. This includes dice for the BtG check, damage dice, AND the enemy’s saving throw dice. Limit once per die. +3 humility.
+Holy Warrior (cleric only, requires BtG bonus of +4): All current and future class levels become specialized in the melee weapons skill. Unlocks the paladin maneuvers. Before using a paladin maneuver of mana cost N, you may spend 1 humility. If so, make a DC 5*N+10 beseech the gods check with half of your bonus. If you succeed, you may ignore the mana cost of the maneuver. Paladin maneuver DCs are 8 + your BtG bonus. +2 humility
+Lucky Hit (cleric only, requires Holy Warrior): When you crit with an attack, you may use a known paladin maneuver for free. +2 humility
+Shots of Faith (cleric only, requires Rapid Shot): All current and future class levels become specialized in the ranged weapons skill. When you take the Attack action with a longbow, you may gain an extra attack at the cost of giving yourself disadvantage on all attacks you make in that action. If all of those arrows (including the final one) hit, then your final attack crits. When attacking in this way, you may apply paladin maneuvers to your ranged attacks. +1 forgiveness, +1 humility
+Divine Sanctuary (cleric only, requires BtG bonus of +8): As a reaction when you or an ally within 120’ that you can see would take damage, you may make a beseech the gods check. The DC is 10 + X, where X is your BtG  bonus. You get a -5 penalty on this check if targeting yourself.  If you succeed, you enshroud the target within a divine sanctuary, which vanishes at the end of their next turn. The sanctuary gives them 5*X temporary HP, which takes as much of the triggering damage as possible. Immediately after the target takes the damage, they gain vulnerability to necrotic damage, their speed is reduced to 0, and they are incapacitated. These effects, including any remaining temporary hit points, all end when the sanctuary vanishes or is destroyed. +1 forgiveness, +1 humility
+Master of Guidance (cleric only, requires Giver of Guidance, requires BtG bonus of +5): Guidance now uses 1d6, can apply to anyone within 30 feet, can be used on major skill checks or attack rolls, and can be done as a bonus action. +1 forgiveness, +1 humility
+Aura of Light (cleric only, requires charisma bonus of +5): As a bonus action, you may conjure an aura of light, centered on yourself. The light produced by this is equivalent to a torch (20 ft bright, 20 ft dim). While this light is active, any ally (not yourself) within 10 ft of you has an additional bonus to any dodge, resistive willpower, or constitution-based checks, which is equal to ½ your charisma bonus. The aura disappears if you go unconscious. +1 forgiveness, +1 humility
+Aura of Light II (cleric only, requires Aura of Light): While your aura of light is active, any fiend or undead that starts its turn within 10 feet of you takes radiant damage at the start of its turn equal to half your charisma bonus. Additionally, any ally (not yourself) within 10 feet of you can’t become poisoned or diseased, and they have advantage on saves against effects that cause any of the following conditions: blinded, charmed, deafened, frightened, paralyzed, petrified, and stunned. +1 forgiveness, +1 humility
+Spell Resistance (cleric only, requires +5 resist damage bonus): Your damage resistance from wearing armor provides damage resistance to all damage types. +1 forgiveness +3 humility
+Anti-Magic Shield (cleric only, requires Spell Resistance): As a reaction to being targeted by or caught in the AoE of a spell, you may raise your shield as a holy barrier against it. Roll a d20. On a 10 or higher, you have advantage on saves against the spell / the caster has disadvantage on the spell attack roll. On a 20, the spell has no effect on you. This feat only applies while you are wielding a shield. +1 forgiveness +2 humility
+Wildshape I (cleric only, requires BtG bonus of +5): You have double advantage on any beseech the gods check for wildshape prayers. Your cleric levels lose resist damage specialization, but gain resistive willpower specialization. +1 forgiveness, +1 humility
+Wildshape II (cleric only, requires Wildshape I): All DCs for wildshape prayers are lowered by 5. Half the DC increase for adding swim/fly speed or smaller sizes. Wildshape prayers can be done as a bonus action, and you may dismiss them similarly. +1 forgiveness, +1 humility
+Wildshape III (cleric only, requires Wildshape II): Your natural weapon attacks while wildshaped count as magical for the purpose of overcoming damage resistance. When you take damage in wildshape, you may opt to have that damage ignore your temporary HP. You get a +N bonus to the form's attack rolls, armor AC, and physical skill checks, where N is equal to 1/3 of your BtG bonus, rounded down. +1 forgiveness, +1 humility
+Chosen of Bastet (cleric only, requires BtG bonus of +3): +1 forgiveness, +1 humility. You gain permanent catlike features upon yourself — cat eyes, cat ears, cat claws, cat whiskers, and a cat tail. You gain the following features:
+60 feet of darkvision
+advantage on perception and athletics checks
+retractable Claws (see weapon description). 
+20 ft climbing speed while you have claws extended, are not wearing shoes, and have 3+ of your limbs are free. 
+If you aren’t grappled or incapacitated, you treat falls as if they were 20 feet shorter and you take ¼ as much fall damage after that, landing on your feet. 
+Wings of an Angel (cleric only, requires BtG bonus of +6): You gain a pair of angel wings on your back, which you can freely extend or retract as an action. While you have them extended, you have a 60 feet flying speed. Your carrying capacity while flying is 75+10*[strength bonus]. Figuring out shirts and armor is your responsibility, but if you e.g. have wing slits cut in the back of light armor, you can extend your wings through them without them getting stuck. Putting wing slits into metal armor is a. Annoying to do, b. Something that will give the armor -1 AC. +2 forgiveness, +1 humility
+Minor Feats:
+Ardent Acolyte (cleric only): Choose three prayers with the “acolyte” tag, one of which must be DC 5 or less. These prayers are automatically prepared for you, and when you successfully pray for them, they cost 1 less mana. You may swap out one of the chosen prayers at each level up. +1 forgiveness
+Giver of Guidance (cleric only, requires BtG bonus of +4): As an action, you may touch a creature (including yourself) to grant them +1d4 bonus on their next minor skill check in the next minute. Only one creature may be under your guidance at a time.
+Inner Light (cleric only, require BtG bonus of +3): You gain 60 feet of darkvision and have advantage on checks to detect illusions. +1 forgiveness
+Divine Health (cleric only, requires +3 resist condition): You become immune to disease and gain advantage on resist damage checks. +1 humility.
+Life Awareness (cleric only, requires BtG bonus of +5): As a bonus action, you can sense the current HP of all creatures within 5 feet of you. +1 forgiveness
+Easily Forgiven (cleric only): You can remove all minor penalties to divine favor by confessing and apologizing for your sins in front of either a cleric or an audience of at least 3 other people. Once per week, you can also remove a moderate penalty to divine favor by doing the same. Once per month, you may remove a major penalty to divine favor by confessing / apologizing in front of a large crowd or the head priest of a temple. Once in your life, you may remove an extreme penalty to divine favor by confessing / apologizing in front of a high priest of a “good” kingdom. This happens before forgiveness applies. +2 forgiveness, +1 humility.
+Aquatic Affinity (cleric only, requires BtG bonus of +3): You gain the ability to transform into a mer-person (half fish) at will. While in mer-form, you have 30 feet of swim speed, you can breathe underwater, and you don’t get penalties to vision while underwater. While underwater, you can telepathically also broadcast your voice to anyone within 15 feet of you (no selective telepathy). You cannot wear heavy armor while in mer-form. +1 humility
+Wildshaped Prayer (cleric only, requires Interact with Nature bonus of +12): While you are a beast or elemental, you may use grunts/growls for the verbal component of prayer, and you may complete the somatic component of prayer with a simple bow of your head. +1 forgiveness
+Shifter (cleric only, requires +4 interact with nature): After each long rest, pick a beast that is tiny or larger. For the rest of the day, after spending an action to dismiss a prayer that wildshaped you into that creature, regain any humility you spent on that prayer. +1 humility
+
+
+Chapter 3: General Rules:
+Combat:
+Combat works roughly like it does in 5e, with the following exceptions:
+Actions:
+5e states this poorly, but each round you get an Action, a Bonus Action, a Move Action, an Interact with an Object Action, and a Reaction (usable on turns other than your own). While you mostly have exactly one of each of these in 5e, there are feats which let you get multiple of some of these in the Gairos system.
+
+Any bonus action: For the most part, anything you can do as a bonus action, you can instead do as an action. The exception is spells that give you a new bonus action type. 
+Beseeching the Gods: This is a new type of regular action in the Gairos system. See the “Religion” section for details.
+Casting a Spell: This works differently in the Gairos system. Notably, all spells take an action by default. See the “Magic” section for details.
+Dashing (part 1): When you attempt to Dash and are not immune to exhaustion, you must make a DC N endurance check, where N is 2*[number of times you have Dashed in the past 5 minutes]. On a failure, you are too exhausted to move, and the action you were using to dash is used up. You can still use your regular movement as normal. (Note that endurance is an italicized skill and it’s possible to fail even DC 0 checks depending on the situation with your armor.) 
+Attacks of Opportunity:
+You may use a reaction to take an attack of opportunity against someone you can see who is within your reach. By default, your reach is 5 ft. Doing any of the following things triggers an attack of opportunity:
+Intentionally moving further away from an enemy — note that this is similar to 5e’s “moving out of reach”, but it lets wielders of reach weapons get AoOs they would get if they didn’t have a reach weapon. This movement can trigger a maximum of one AoO from that enemy, even if they have the combat reflexes feat.
+Standing up from prone
+Picking an item up off the floor
+Death and Reaching 0 HP:
+When you reach 0 HP and the damage that brought you there was not non-lethal:
+Make a resist damage check to avoid instantly dying. The DC is 10+[overkill]-[your max HP]. For example, if you’re at 2/9 HP and you then take 15 damage, you need to succeed on a DC 14 resist death check in order to not die.
+Make a resist damage check to avoid acquiring an injury. The DC is 10+[overkill]. If you fail the check by N, you get a minor injury when N <= 10, moderate injury for 10<N<=20, and major injury for N>20. For example, if you are 5/26 HP and you take 20 damage, you need to make a DC 25 resist injuries check; getting a 15-24 would be a minor injury, 5-14 would be a moderate injury, and 4 or less would be a major injury.
+
+When you are at 0 HP, you are unconscious and bleeding out. If you succeed on 3 total death saves, you are unconscious but stable, and if you fail on 3 total death saves, you die.
+
+When you start your turn at 0 HP:
+Make a death save. This is a DC 20 resist damage check. Rolling a 1 counts as two failed death saves. Rolling a 20 causes you to regain 1 HP and no longer be unconscious.
+
+If you take damage while at 0 HP:
+Follow the “when you reach 0 HP steps”, but where your current HP is 0. 
+Make resist damage check with DC 20 + [damage taken]. If you fail, you fail another death save. If you fail by 15 or more, treat it as two failed death saves instead.
+
+As an action, you can attempt to stabilize someone with 0 HP. This requires a successful DC 20 knowledge (biology) check. You can also use a healer’s kit to automatically succeed on this check.
+Unseen Creatures / Invisibility:
+You do not know what square an unseen creature is in, though you can guess a square and attack it or shoot to hit the first valid target in a line. Attacks against an unseen creature imposes disadvantage, and unseen creatures attack you with advantage. However, if an unseen creature attacks you in melee, you know which square the attack came from. (You can opt to ready an action accordingly.) You can’t take AoOs against unseen creatures.
+Jumping
+Jumping is an athletics check. The DC of an N-ft long jump is N, and the DC of an N-ft high jump is 4*N, provided you have a 20 foot running start. The DC is doubled without a running start. When attempting a jump, you must have enough movement to complete the full jump. If your speed is < 30 ft, you take a -6 penalty for every 10 ft of speed less. If your speed is > 30 ft, you gain a +4 bonus for every 10 ft of speed extra you have. Dashing does not affect your speed for this purpose. Unless you have ranks in the athletics skill, you land prone at the end of a jump unless you beat the DC by 5 or more.
+
+When doing a long jump to clear a gap, if you fail by less than 5, you may make a DC 15 dodge check to grab the edge of the gap. 
+
+When doing a high jump, you add 2x your athletics modifier to the check, rather than your athletics modifier. If your high jump + vertical reach is enough to reach the edge of a surface, you may grab it and later pull yourself up. Creatures have vertical reach according to the table above. Quadrupeds have reach as if they were one size smaller, unless they can easily stand on their hind legs. Hopping up to an object no taller than your waist, such as a table can instead be done with a DC 10 athletics check and 10 ft of movement.
+
+Pulling yourself up from the edge of a surface you’ve grabbed requires a DC 15 athletics check and half your movement, triggering AoOs as if you were standing up from prone.
+
+If you intentionally jump from a height, you take less damage than you would if you just fell. The DC to jump down from a height is 15, with no effect from a running start. If you succeed, you take fall damage as if you had dropped 10 fewer feet.
+Maneuvers:
+You have N learned maneuvers at a time, where N equals your athletics bonus. You cannot use multiple of these maneuvers as part of the same attack.
+
+N is set every long rest, based on its minimum value during that entire long rest. When N is temporarily increased (e.g. via Belt of the Body), you choose to learn new maneuvers equal to that increase, which are the same ones you unlearn if that increase goes away. The reverse is also true (e.g. via the concussion 3 injury) in that you choose which maneuvers to lose when you lose them, and you gain those same maneuvers back if that decrease goes away. If you level up, you may rearrange these assignments. At level up, you learn new maneuvers equal to the increase in N, and can also swap out floor(N / 4) maneuvers. 
+Suffocation and Underwater Combat
+Most attacks have disadvantage when attacking underwater. The exceptions are:
+Melee attacks by a creature with a swimming speed
+Light weapon attacks (and attacks by non-standard weapons such as tridents)
+Crossbow attacks
+Additionally, creatures/objects fully submerged take half damage from fire (stacking with fire DR), and ranged attacks beyond a weapon’s normal range automatically miss. Lanterns do not function as light sources underwater, and normal speech cannot be heard underwater.
+
+You can hold your breath for a number of minutes equal to your  endurance bonus. When out of breath, you can survive for [Endurance] rounds, after which you drop to 0 hp and start dying. You can’t regain hp or become stable until you can breathe again. You stop holding your breath if you are unable to breathe and any of the following happen:
+You use a verbal component of a spell/prayer
+You speak/sing over the course of a round
+You become incapacitated
+You take damage and fail a Resist Pain check with DC equal to 5+the amount of damage taken  
+
+If you are out of breath, you cannot talk or use verbal components of spells/prayers. Note that unbreathing creatures or creatures that can breathe underwater CAN still do such things, though they might not be heard.
+Attached Creatures
+
+Some creatures (including many swarms) can physically climb on or otherwise attach themselves to larger creatures. The following rules apply if you have a creature attached to you:
+The creature moves with you. Thus, it does not get AoOs from you moving.
+If the creature is hostile, your ranged attacks have disadvantage (because there is a hostile creature within 5 ft of you).
+If you attack the creature with a ranged or reach weapon, you have disadvantage (this stacks with the previous point)
+If an attacker wants to attack the creature without hitting you, they can either make the attack with disadvantage, or have the attack deal ¼ of its damage to you on a hit.
+
+There might be various ways a swarm or tiny creature could climb onto you, but usually this requires either them making a successful attack roll or you failing a dodge check, depending on the situation. You can also willingly let a tiny or smaller creature (usually a familiar) climb onto you. It can fit into in a backpack (or possibly a pocket) for ¾ cover, or it can fit in a backpack that is fastened closed for full cover. It requires your Interact with an Object action to fasten or unfasten a backpack. It requires the creature’s Hide action for them to crawl into a backpack, but only movement for them to crawl into a pocket. Such creatures can only take the Help action when outside of pockets/backpacks. Friendly attached creatures also do not assist with adjacency requirements for things like Sneak Attack or Pack Tactics.
+Misc:
+Unlike in 5e, being prone doesn’t provide disadvantage for attacks > 5 ft away (though it could give cover bonuses against e.g. a far-away ranged attacker). As usual, attackers within 5 ft do still have advantage on prone targets.
+Everyone has 30 feet of movement by default.
+Initiative rolls are an initiative skill check. During the first round of combat, you can freely delay your initiative until later (as long as you haven’t started taking your turn). Effectively, higher initiative rolls are strictly better.
+“Proficiency” doesn’t exist in the Gairos system and there are no ability modifiers to add to damage rolls (though some weapons have strength requirements to use).
+Specific weapon attacks may work differently — see the weapons section.
+Grappling and shoving are contested strength checks.
+When you grapple as part of the Attack action, it must replace an attack made with your full bonus, i.e. it can’t be a multiattack done at a penalty, and it can’t be done after you use Combat Expertise
+In contrast, if you can replace an attack with something that uses a save DC (e.g. some of the weapon bond maneuvers), you CAN use them with feats that would give you an attack penalty, but then the DC decreases by the corresponding amount. For example, You can shoot a Piercing Arrow as part of a Rapid Shot attack, but the save DC is 1 lower than normal. However, anything else that would affect your attack bonus (e.g. +1 weapon, advantage/disadvantage, etc) has no effect.
+½ cover gives a +2 bonus to circumstance AC and to dodge checks not involving area of effect damage, while ¾ gives a +5 bonus to the same.
+Vulnerability works the same, but damage resistance is different. Something with resistance N to a type of damage ignores the first N of that damage from a single effect. Multiple effects providing damage resistance do not stack.
+Thunder damage is relabeled as sonic damage.
+Advantage and disadvantage can stack arbitrarily, as long as they are from different sources. For example, if you’re attacking a sleeping enemy in melee, you would have advantage from them being prone, advantage from them being unseen, and advantage from them being unconscious, for triple advantage. However, if you’re invisible and a creature is blinded, that’s only normal advantage. 
+You can only drag someone who is prone, and you cannot drag someone while prone. 
+Your size affects certain things. See the “size categories” tab here.
+The poisoned condition gives you disadvantage on attack rolls, initiative rolls, and minor skill checks
+Exhaustion table (otherwise exhaustion works the same as 5e):
+1 Disadvantage on Minor Skill Checks
+2 Speed halved
+3 Disadvantage on attack rolls and Major Skill Checks
+4 Hit point maximum halved
+5 Speed reduced to 0
+6 Death
+Resting:
+During a long rest, you recover ¼ of your HP and all of your mana. Short rests don’t have a default effect, but some abilities may reference them. You automatically take a short rest when you take a long rest.
+
+If you sleep in medium or heavy armor, you must make endurance check equal to the ISDC or take a level of exhaustion.
+Long-Term Conditions:
+Some conditions last well beyond the end of combat—hours, days, or forever. 
+Injuries:
+The following are examples of acquirable injuries. Most injuries happen when you go unconscious; see Death and Reaching 0 HP. If you would receive an impossible injury (e.g. breaking a finger when you’ve lost both your hands), reroll. Unless an injury says otherwise, reroll if you receive it and it cannot stack.
+Minor Injuries:
+Blood Loss: You have disadvantage on resist damage checks. Heals after 3 days. If you receive this injury twice, it goes away and you gain the Severe Blood Loss Injury. 
+Bruising: Whenever you would take N bludgeoning, force, or sonic damage from any source, take N+3 damage instead. Heals after 3 days. This injury can stack.
+Open Wound: You lose 1 HP per hour the wound persists. Once per hour, you can expend a use of a healer’s kit to treat this wound. After 10 uses, the wound heals. This injury can stack.
+Blurred Vision: You have disadvantage on vision-based perception checks and on ranged attack rolls. Will heal after a long rest. This injury can stack.
+Ringing Ears: You have disadvantage on perception checks that rely on hearing. Will heal after a long rest. This injury can stack.
+Limp: Your walking speed is reduced by 5 feet. You must make a DC 13 athletics check after using the Dash action. If you fail the save, you fall prone. Will heal after a long rest. This injury can stack; if it does, the DC increases by 5.
+Pulled Bicep: You have disadvantage on strength checks. This injury stacks, but can’t be received more than twice. Heals after a long rest.
+Pulled Thigh: You have disadvantage on endurance checks; forced movement triggers such a check on you (falling prone on failure). The disadvantage from this injury stacks, but can’t be received more than twice. Heals after a long rest.
+Dazed: You can’t take bonus actions or reactions. Heals after a long rest. Cannot stack.
+Minor Mental Trauma: You gain a temporary madness: a phobia applicable to the combat that injured you. This injury can stack, applying to a different madness each time.
+Mild Concussion 1: Disadvantage on checks to maintain concentration on a spell. This lasts 3 hours. This injury can stack.
+Mild Concussion 2: Gain the Dizziness madness for 3 hours. Cannot stack.
+Mild Concussion 3: For 3 hours, gain disadvantage on initiative and dodge checks. Cannot stack.
+Mild Concussion 4: Gain the Slowed Thinking madness for 3 hours. Cannot stack.
+Mild Concussion 5: You are stunned for 1d4 rounds upon revival. Cannot stack.
+Locked Muscles: You are restrained for 1d10 rounds upon revival. Cannot stack.
+Shock: For the next minute after revival, you are incapacitated and cannot stand up from prone. Cannot stack.
+Charlie Horse: Make a resist/death injury check. For the next 1d10 minutes after revival, your movement speed cannot exceed this number (rounded to nearest 5). Cannot stack.
+Blood in Eyes: You are blinded until you use an action to rinse your eyes with water. Cannot stack.
+Minor Scar: +1 to charisma bonus. No adverse effects. This injury can be received multiple times, but the effects do not stack.
+Moderate Injuries:
+Severe Blood Loss: While this injury persists, you have disadvantage on all constitution-based checks, you gain the dizziness madnesses, and you count as having automatically failed 1 additional death save. Heals after 3 days. This injury can stack up to 3 times (the madnesses do not stack).
+Horrible Scar: Disadvantage on charisma checks and perform checks to persuade. Advantage on perform checks to intimidate.  This injury can be received multiple times, but the effects do not stack.
+Festering Wound: Your HP maximum is reduced by 1 for every 24 hours the wound persists. Once per 24 hours, you can expend a use of a healer’s kit to treat this wound. After 10 uses, the wound heals and you regain the max HP.  This injury can stack.
+Broken Rib: When you take an action in combat, you must succeed on a DC 15 resist damage check, or you lose your action and can’t take reactions until your next turn. Will heal after 9d6 days of rest. This injury can stack; if it does, the DC increases by 5.
+Punctured Lung: Gain a level of exhaustion. A long rest does not remove this condition. Will heal after 9d6 days of rest. This injury can stack.
+Ruptured Liver: Gain the poisoned status. Will heal after 9d6 days of rest. This injury cannot stack.
+Ruptured Intestines: Taking the attack or dash action deals 1d6 slashing damage to you, ignoring DR. Will heal after 9d6 days of rest. This injury can stack.
+Busted Kidney: At the end of your turn, if you’ve taken an action, make a DC 15 resist damage check or fall prone. Will heal after 9d6 days of rest. This injury can stack; if it does, the DC increases by 5.
+Broken Arm or a Hand: You can no longer hold anything with two hands, and you can hold only a single object at a time. Will heal after 9d6 days of rest.  If you would receive this injury a second time, you instead cannot hold any objects. Otherwise this cannot stack.
+Broken Foot or Leg: Your walking speed is halved and you must use a cane or crutch to move. You fall prone after using the Dash action. You have disadvantage on athletics checks. Will heal after 9d6 days of rest.  If you would receive this injury a second time, you instead cannot walk. Otherwise this cannot stack.
+Break a Finger: You have disadvantage on checks with fine tools using the hand with which you broke the finger. Will heal after 9d6 days of rest. This injury can be received up to 10 times.
+Magical Backlash: If you would receive this injury from non-magical damage, reroll. Otherwise, roll a d4 and take the following permanent effect. 1. You age by 2d6 years. 2. Your height increments by 2d10-11 inches (decrementing on a negative result). 3. All your hair falls out. 4. Your hair turns a random (likely unnatural) color. This injury can stack.
+Mental Trauma: You gain a temporary madness: a phobia applicable to the combat that injured you. This lasts 4d6 days. This injury can stack, applying to a different madness each time.
+Concussion 1: Maintaining concentration on spells requires an additional DC 15 resist damage check at the end of each turn. This lasts 2d6 days. This injury can stack; if it does, the DC increases by 5.
+Concussion 2: Gain the Dizziness madness for 2d6 days. Cannot stack.
+Concussion 3: For 2d6 days, gain disadvantage on initiative and dodge checks. Cannot stack.
+Concussion 4: Gain the Slowed Thinking madness for 2d6 days. Cannot stack.
+Concussion 5: You gain a random form of temporary madness from the amnesia category. This lasts 2d6 days. If you would receive this injury multiple times, reroll until you get a madness you don’t have; if you have all the available madnesses already, this cannot stack.
+Nerve Damage 1: For 4d6 days, lose all bonus actions and reactions. Cannot stack.
+Nerve Damage 2: For 4d6 days, gain the Painlessness madness. Cannot stack.
+Major Injuries:
+Coma: You do not regain consciousness upon being healed. Instead, you regain consciousness 3d20 days later. Cannot stack.
+Internal Damage 1: Permanently fail a death save. This injury can stack up to 3 times.
+Internal Damage 2: Your max HP decreases by 1d10. This injury can stack.
+Internal Damage 3: Lose 1 PHYS. This injury can stack.
+Internal Damage 4: Lose 1 CON. This injury can stack.
+Brain Damage 1: Lose 1 MEN. This injury can stack.
+Brain Damage 2:  Lose 1 SOC. This injury can stack.
+Broken Spine: Your motor function is severely inhibited, and you become permanently restrained. Heals in 2d6 months. If you would receive this injury a second time, you become paralyzed instead. Otherwise this cannot stack.
+Lose an Eye: Disadvantage on vision-based perception checks and ranged attack rolls. If you lose two eyes, you are blinded. Otherwise this cannot stack.
+Lose an Arm or a Hand: You can no longer hold anything with two hands, and you can hold only a single object at a time. If you would receive this injury a second time, you instead cannot hold any objects. Otherwise this cannot stack.
+Lose a Foot or Leg: Your walking speed is halved and you must use a cane or crutch to move unless you have a peg leg or other prosthesis. You fall prone after using the Dash action. You have disadvantage on athletics checks. If you would receive this injury a second time, you instead cannot walk. Otherwise this cannot stack.
+Lose a Finger (thumb): You cannot wield a weapon in the hand without the thumb or do other tasks with the hand which would require a thumb. This injury can be received up to 2 times.
+Lose an Ear: You have disadvantage on charisma checks, persuasion-based performance checks, and perception checks that rely on hearing. You have advantage on intimidation-based performance checks. This injury can be received up to 2 times, but the effects do not stack.
+Teeth Knocked Out: You have disadvantage on persuasion-based performance checks checks. Evoke runes DCs increase by 5 for spells where you are using a verbal component. This injury can be received up to 5 times, but its effects do not stack. 
+Lose a Nose: You have disadvantage on charisma checks, persuasion-based performance checks, and perception checks that rely on smell. You have advantage on intimidation-based performance checks. This injury cannot stack.
+Major Magical Backlash: If you would receive this injury from non-magical damage, reroll. Otherwise, roll a d4 and take the following permanent effect. 1. You gain magic vulnerability (disadvantage on saving throws against spells). 2. You become blinded, but permanently under the effects of Detect Magic as if you were not. 3. Your spells become mana-inefficient as if you were under a curse of inefficiency. 4. You become vulnerable to force damage. Like results cannot stack. 
+Severe Mental Trauma: You gain a permanent madness: a phobia applicable to the combat that injured you. This injury can stack, applying to a different madness each time.
+Severe Concussion 1: Disadvantage on checks to maintain concentration on a spell. Maintaining concentration on spells requires an additional DC 15 resist damage check at the end of each turn.  This lasts for 2d6 months. This injury can stack; if it does, the DC increases by 5.
+Severe Concussion 2: You gain 2 random madnesses from the Amnesia, Delusions, or Perception/Semi-physical Issues categories. This lasts for 2d6 months. If you would receive this injury multiple times, reroll until you get a madness you don’t have; if you have all the available madnesses already, this cannot stack.
+Lose a Finger (not thumb): You have disadvantage on checks with fine tools using the hand with which you lost the finger. If you lose all the fingers from one hand, then it functions as if you had lost a hand. This injury can be received up to 8times.
+Madness:
+Madness can be either temporary or permanent. Madness builds on itself, and if the length of temporary madness is not specified, it lasts 3*2^n hours, where n is how many instances of temporary madness you are already suffering when you acquire the new madness. Permanent madness is just that: everlasting and incurable.
+
+The following are examples of acquirable madness. Mechanical effects of a madness are a supplement, not a replacement for roleplay effects.
+
+Emotion Loss: You can no longer experience that particular emotion
+Emotion Loss: Happiness
+Emotion Loss: Sadness
+Emotion Loss: Compassion and Guilt
+Emotion Loss: Disgust
+Emotion Overload: You experience far too much of that particular emotion, almost constantly. If you have corresponding loss and overload for the same emotion, flip a coin after each long rest to see which one you get.
+Emotion Overload: Happiness
+Emotion Overload: Sadness and/or Guilt
+Emotion Overload: Compassion: DC 20 assertive willpower check to take any hostile action (e.g. attack, cursing or damaging spell, smiting prayer). Advantage on beseech the gods checks.
+Emotion Overload: Disgust: DC 20 assertive willpower check to do something gross/unclean, such as wading through mud or touching a mangy animal
+Emotion Overload: Anger
+Other Emotional Issues:
+Utility Monster: You feel all feelings 5x as strongly
+Emotional Blindness: You lack the ability to imagine what other people are feeling, and their emotions become unreadable to you unless they outright tell you. Auto-fail sense motive checks.
+Obsessiveness: You become obsessively fixated on particular tasks, people, or activities. 
+Lack of Confidence: You lose faith in your own competence, feeling deep inferiority and anxiety. You feel like other people are much more capable than you, and this may cause you to treat them with special respect or fear. Disadvantage on charisma, assertive willpower, and intimidation-based perform checks.
+Narcissism: You become arrogant, selfish, and overconfident. Disadvantage on beseech the gods checks, advantage on charisma checks.
+Overattachment: You feel very attached to and dependent on one person in particular. You have disadvantage on all attack rolls and skill checks when they are more than 60 feet away from you.
+Berserker: When you take damage in combat, you must succeed on a DC 20 assertive willpower check or go berserk. While berserk, you must use your action each round to attack the creature nearest to you. If you can make extra attacks, you do so, moving to Attack the next nearest creature after you fell your current target. If you have multiple possible targets, you attack one at random. You are berserk until you start your turn with no creatures within 60 feet of you that you can see or hear.
+Addiction: You get particular satisfaction from a vice. If you have an opportunity to indulge your addiction in a way you might consider under normal circumstances, you must make a DC 20 assertive willpower check to avoid doing it. If you go a day without indulging, make a DC 20 resistive willpower check. If you fail, you suffer disadvantage on mental and social checks for 24 hours or until you indulge. If you’ve had this madness for at least a week, it becomes “a week without indulging” instead. (Note that addiction does not alter your sense of morality.)
+Addiction: Killing: need check to deal non-lethal damage or to spare an unconscious enemy after combat
+Addiction: Alcohol
+Addiction: Sex
+Addiction: Lighting Fires (Pyromania)
+Addiction: Stealing (Kleptomania)
+Addiction: Potions
+Addiction: Pain (others)
+Addiction: Pain (self): You have advantage on resist pain checks
+Addiction: Risk Taking: You have advantage on resistive willpower checks against fear
+Addiction: Sinning
+Phobia (Creatures and more): You have disadvantage on checks to resist abilities from your source of fear. Whenever you are within 60 ft of your fear and are aware of it, you must make a DC 20 resistive willpower check or become frightened. You can repeat the check at the end of each turn, with disadvantage if your fear is within your line of sight. If you succeed on the check, your fright ends and that particular instance of it doesn’t trigger your phobia for 24 hours.
+Phobia: Aberrations and Monstrosities
+Phobia: Constructs and Machinery: You have disadvantage on ability checks you make to operate or figure out a mechanical device. 
+Phobia: Dragons
+Phobia: Fiends
+Phobia: Insects or Snakes
+Phobia: Lycanthropes
+Phobia: Oozes and Acid: You are vulnerable to acid damage, due to shock.
+Phobia: Undead and Necrosis: You are vulnerable to necrotic damage, due to shock.
+Phobia: Wild Beasts
+Phobia: Damage Types: You take double damage from the source of your fear, due to shock.
+Phobia: Cold
+Phobia: Fire
+Phobia: Lightning and Radiant: DC 20 resistive willpower check or become frightened for a turn after seeing a bright flash
+Phobia: Psychic: DC 20 assertive willpower check to ever willingly engage in telepathy. Disadvantage on resistive willpower checks against effects that would give you the charmed condition.
+Phobia: Poison: You get double disadvantage from the poisoned condition.
+Phobia: Sonic: DC 20 resistive willpower check or become frightened for a turn after hearing a loud noise (e.g. thunder)
+Phobia: Things to Avoid: You will take great inconvenience in order to avoid interacting with your phobia in any way.
+Phobia: Books, Reading, and Writing: DC 20 assertive willpower check to attempt to evoke runes from parchment (only DC 10 to evoke them from other surfaces). You are completely unwilling to write runes onto anything. 
+Phobia: Children
+Phobia: Commitment
+Phobia: Crowds
+Phobia: Cursed Items: Any item of unknown maker has some chance of being cursed, you know. At least until someone else tries it out for a long enough period of time.
+Phobia: Heights
+Phobia: Lakes and Oceans
+Phobia: Lewdness: Any sexual affection or nudity makes you extremely uncomfortable 
+Phobia: Mirrors: You will avoid circumstances and areas that would cause you to look at a mirror. 
+Phobia: Silence: You talk to fill lulls in conversation, you can’t fall asleep without some level of noise.
+Phobia: Other
+Phobia: Being Alone: You have disadvantage on all attack rolls and skill checks whenever you cannot see or hear any non-hostile creatures. 
+Phobia: Being Grappled/Restrained: Whenever you are grappled or restrained, you are also paralyzed. At the start of each of your turns, you may make a resistive willpower check (DC = the escape DC of the grappling/restraining effect). On a success, you are no longer paralyzed. 
+Phobia: Blood: If you hit or are hit with a slashing/piercing weapon which deals damage, DC 20 resistive willpower check or become frightened until the end of your next turn.
+Phobia: Claustrophobia: You have disadvantage on all attack rolls and skill checks while in a tunnel or other area where walls are on each side of you.
+Phobia: Darkness: You have disadvantage on all attack rolls and skill checks while in darkness.
+Phobia: Dying: You have disadvantage on all attack rolls and skill checks while at < ¼ of your HP.
+Phobia: Open Spaces: You have disadvantage on all attack rolls and skill checks while in a clearing or other area outside with no walls or clusters of trees nearby.
+Phobia: Prayer: You have double disadvantage on beseech the gods checks. DC 20 resistive willpower check or become frightened until the end of your next turn whenever someone beseeches the gods and you notice.
+Amnesia
+Informational Amnesia: It’s harder for you to recall information. Disadvantage on all knowledge checks.
+Partial Memory Loss (time): You have lost some period of your life: maybe a section of your childhood, maybe the past year.
+Partial Memory Loss (people): You don’t recognize certain people and have no memory of your relationship with them.
+Partial Memory Loss (major skill): You have -3 to your highest skill among melee weapons, ranged weapons, evoke runes, or any of the beseech skills. If tie, random.
+Partial Memory Loss (minor skill): You have -5 to your highest minor skill among your highest minor skill that is NOT strength, charisma, perception, or anything CON-based.
+Full Identity Memory Loss: You have no idea who you are, though you remember the current state of the world. You still recognize people, have knowledge about them, and have some emotional impressions, but you have no memory of your relationship with them.
+Memory Formation Troubles: Your short term memory is abysmal and you forget things people just said.
+Losing Time: You sometimes blackout and have no idea what happened for the last several hours. 
+Compulsions and Behavioral Changes
+Compulsive lying
+Oversharing: You say basically anything that comes to mind and narrate your actions as you do them. Double disadvantage on deception checks. Disadvantage on stealth checks involving being quiet.
+Inappropriate laughter: You find the most serious of situations outrageously funny. DC 20 assertive willpower to not crack up on such occasions.
+Inappropriate eating of things: And licking of things. DC 20 assertive willpower check to not do things like munching the soap.
+Inappropriate conversational topics / no sense of boundaries: You honestly have lost all sense of what might be polite conversation, what questions/actions are too private, etc. Personal space — what’s that?
+Extreme rebelliousness: You defy people just to be defiant. DC 20 assertive willpower check to not ignore / do the opposite of whatever someone else wants you to do.
+Over-religiousness: You feel much more strongly connected to the gods above and you now care deeply about your divine favor. DC 20 assertive willpower check to commit a moderate sin or worse, DC 10 to commit a minor sin.
+Delusions
+Paranoia: Auto-fail sense motive checks. It’s all lies! They’re all out to get you!
+Overtrusting: Auto-fail sense motive checks. Why would someone lie? Auto-fail deception checks. Why would you need to lie to someone? If someone tells you to do something, DC 20 assertive willpower check to not take their suggestion. Really, why wouldn’t you trust their judgment?
+Delusions of grandeur: Godhood, polymorphed dragon, royalty—any of it is possible, and you’re firmly convinced of it.
+Racial delusions: believing oneself to be vampire when not or vice versa e.g.
+Delusions of parenthood (ideally over other PC): Oh, you’ve just discovered your long lost child! How can you make up for your years of absent parenthood?
+Imaginary friend: Shame that that one friend of yours is just invisible.
+Sentient Item: Related to above, but it’s your sword or something
+Believing oneself to be a child: You’re just trapped in an adult body, weird. If you’ve even noticed.
+Conspiracy theories: You’re utterly convinced of one.
+4th wall breaking: A specific case of the previous. There are giants looming over you, rolling dice. There is only one god, and she’s known as the DM…
+Hypochondria
+Perception and Semi-physical Issues
+Face blindness
+Seeing in greyscale
+Hallucinations (visual)
+Hallucinations (audio)
+Painlessness: You automatically succeed on resist pain checks. You are unaware of your HP total or how much damage you take. For rare effects, such as long-acting poisons, you may be unaware of taking damage at all.
+Dizziness: Disadvantage on balance-based athletics checks. After you take damage, you also fall prone.
+Fatigue: Disadvantage on strength, endurance, and initiative checks. 
+Slowed Thinking: -1 to mental attribute
+Insomnia: You have trouble sleeping, sometimes unable to fall asleep at all. ¼ chance of no long rest benefits.
+Nightmares: half long rest benefits
+Speech Issues
+Muteness: You are unable to speak. This includes the verbal components of spells. 
+Mimicry: You are compelled to mimic what other people say.
+Stutter: Disadvantage on charisma checks. +5 Evoke Runes DC of spells with a verbal component. 
+No words > 1 syllable: This prevents the verbal components of any spell with runic complexity >=2, as well as half of spells with runic complexity 1.
+Other
+Miscellaneous: You are struck with madness according to the DM’s whim. Feel free to give suggestions!
+
+
+
+Chapter 4: Religion:
+Divine Favor:
+Each human has a certain amount of divine favor. They can increase or decrease their divine favor based on their actions. Typically, it is thought that moral actions increase divine favor and vice versa, but this is somewhat conflated since many define morality in terms of what the gods approve of. Your divine favor is computed nonlinearly from the set of actions you take; it is up to the DM exactly how this function is computed, but it’s generally thought that “bad” actions affect your divine favor for longer than “good” actions and that higher magnitude actions trivialize lower magnitude actions. Generally if you haven’t done any individual thing worse than divine favor -x, your overall divine favor won’t be worse than -2x. 
+
+As a general rule, people have the following amounts of divine favor:
+
++6: a cleric who just rescued a school from evil demons the previous day
++4.5: a combat mage who just rescued a school from evil demons the previous day
++3: a firefighter who rescued a family from a burning building the previous day
++2: a priest who runs a volunteer orphanage, a veteran cleric adventurer (who has saved lives, but a long time ago); both with some forgiveness
++1.5: the 0 group with arbitrarily high forgiveness
++1: the 0 group with +1 forgiveness
++0.5: a cleric still training at an academy, or just out of training (+1 forgiveness)
+0: a religious person who works as a doctor, vet, acolyte, kindergarten teacher, homemaker, healing-based adventurer, etc
+-0.5: a typical religious person
+-1: a typical person, a religious person who wears several magic items 
+-1.5: a typical combat mage, a punk, a magic item crafter, a rogue who uses poison
+-2: someone who does multiple moderately bad things
+-2.5: a mage who uses sketchy-but-legal magic
+-3: a mage using illegal magic, a pickpocket urchin, a high school bully, a smuggler, a fence for stolen goods 
+-6: an average thieves’ guild member (this can vary wildly, of course, e.g. between smuggler and assassin)
+-15: an average bandit or pirate (also quite variable)
+-20: an assassin, a werewolf who indulges their monstrous instincts
+-30: a serial killer
+-50: an ancient vampire who regularly murders people
+Examples of Divine Favor changes:
+The following examples are a very rough correspondence of how different actions affect divine favor. The magnitude of the actions can vary wildly; for instance, forgiving a person who cut in front of you in line could have no effect, while a long personal quest that ends in forgiving the man who killed your mother might be on par with saving someone’s life. Similarly, a wealthy person donating 1 silver piece to their local temple would probably get no favor for the donation, and might even get a divine favor penalty if they’re trying too hard to game the divine favor system. A commoner slaying an imp might get twice as much divine favor as a tough adventurer doing the same deed.
+
+Very good (+3):
+Saving the life of an innocent
+Slaying a powerful evil creature
+Making a significant life sacrifice for the sake of others
+
+Moderately good (+1.5):
+Slaying a weak evil creature
+Donating money to a temple
+Volunteering one’s labor
+Truly comforting someone who is sad
+Healing a stranger
+Giving aid to someone less fortunate than you
+Attending temple services
+Confessing serious sins to a cleric
+
+A bit good (+0.5):
+Being especially nice to an animal or a complete subordinate
+Giving someone an unexpected and genuine compliment
+Showing respect at a temple
+Healing a companion
+Confessing moderate sins to a cleric
+Forgiving someone who wronged you
+
+A bit bad (-0.5):
+Swearing
+Eating meat
+Overeating
+Raising one’s voice in anger
+A benign lie (e.g. “you look great”)
+A small lie (e.g. “No, I don’t think she is attractive”)
+Wishing harm on an innocent
+Using regular day-to-day magic, i.e. low-level non-combat magic
+Littering
+Destroying a place of nature, e.g. cutting down a grove of trees
+Seeing something bad and doing nothing
+Neglecting a duty
+Disobeying a mundane order from a superior
+Being impolite to a host / guest
+Lusting after someone not your spouse
+Gambling
+Using a magic item
+Crafting poison
+Regularly associating in a positive way with someone who does very bad things
+Trying too hard to game the divine favor system
+
+Moderately bad (-1.5):
+Seriously hurting someone’s feelings
+Aiding someone else doing something very bad
+Indulging in mind-altering potions
+Using offensive magic
+Using poisoned weapons
+Hunting for sport
+Getting a tattoo or engaging in self-mutilation
+Disobeying a law while in a non-evil land
+Extra-marital sexual relations
+Many “deviant” sexual practices, e.g. bdsm
+Killing someone with a high level of excuse (e.g. necessary self-defense, total accident)
+Thievery with justification (e.g. “to feed family”)
+Regularly associating in a positive way with someone who does extremely bad things
+Creating a magic item
+
+Very bad (-3):
+Aiding someone else doing something extremely bad
+Using blood magic or other dark arts
+Seriously hurting someone without reason
+Adultery
+Thievery without justification
+Killing someone with sketchy levels of excuse (e.g. neglectful accident, “they were immoral”)
+
+Extremely bad (-15):
+Destroying a holy artifact or desecrating a temple
+Torture
+Rape
+Intentionally killing an innocent
+Raising the dead
+Being an undead or fiend
+
+You can make a Knowledge (Lore) check to estimate the divine favor change from a specific action.
+Divine Favor with Respect to Different Gods:
+It’s not a very well-understood phenomenon, but it’s possible for one’s divine favor to shift not by the actions above, but by worshipping the gods differently. Maybe it’s worshipping a different set of gods, or worshipping different aspects of the gods, or simply following a different but consistent moral system that the gods can still respect. Maybe it’s something about how you feel about your religious connection — whether you view the gods more concretely as moral protectors of the people or more generally as the spiritual connection with the natural world.
+
+The way a person worships the gods is culturally interwoven with their upbringing, and changing it is difficult and gradual. Talk to the DM if you are seeking to change the way you worship.
+
+Prayer / Beseeching the Gods:
+Those faithful to the gods above may pray for their assistance. However, the gods are fickle, and their chance of granting a request varies. Beseeching the gods for a particular favor is an action, which requires paying a certain amount of mana and succeeding on a Beseech the Gods skill check. The total for your roll is 1d20+[appropriate BtG skill bonus] +[divine favor]. Prayers with DC <15 cost 1 mana; otherwise a prayer of DC N costs (N-15)/5+1 mana, rounded up. This includes any modification to the prayer’s DC, such as overpaying or attempting an unprepared prayer. The prayer consumes the mana regardless of whether it succeeds. 
+
+Usually a prayer is spoken out loud and accompanied by clasping one’s hands or presenting an item emblazoned with a holy symbol; in the case of blessing prayers, touching the recipient with a hand is common. You get a penalty on your Beseech the Gods check equal to -5 if the prayer is not said out loud (or -15 for a smiting prayer), -10 if the prayer motion is not done (or -30 for a smiting prayer), and -5 for blessing prayers where the target is yourself. The first two components are typically not doable if one has wildshaped into an animal. 
+
+Prayer is about connection: with the gods, with the world around you, and with other people. Taking the Help action on someone beseeching the gods is thus quite effective (though does cost you the mana of the prayer), especially when their divine favor / skill bonuses to divine favor are better than yours. The Help action also stacks with itself for this purpose. So, a priest praying with the help of their congregation of 30 can reasonably expect to consistently get 19s and 20s on their beseech the gods rolls. Of course, someone cannot help on a prayer if they don’t have enough mana to cover its cost. Additionally, someone cannot help with a prayer if their Divine Favor + appropriate BtG skill bonus is less than -5. 
+
+As part of your connection to the gods, you can conduct a special five-minute ritual after completing a long rest, preparing some specific types of prayers. You can prepare a number of such prayers equal to your charisma bonus. Prayers that you don’t focus on in this way are harder to construct the necessary connection, and have +10 added to their DC.
+
+The gods also appreciate being given the proper respect and honor. Praying in holy places is thus more effective. A proper temple gives a +1 bonus on beseech the gods checks to those within it, while a lesser holy place (e.g. in front of a shrine) gives a +0.5 bonus. Some favors are also much more likely to work if the person praying has made previous temple donations. When a prayer with a recommended donation succeeds, that amount is deducted from the sum of the beseecher’s previous donations (no deduction if it fails). Finally, certain prayers must be done over a longer period of time. Attempting such a prayer without the extended time period automatically fails.
+
+Some prayers require a save or attack roll. Your save DC is 8+[BTG bonus], and your attack modifier is your BTG bonus. By default, healing prayers do not affect undead/constructs. You can view the list of common prayers.
+
+You can make a knowledge (lore) check to estimate the DC for other types of favors.
+
+Note that non-clerics can beseech the gods! A typical believer, walking around with a divine favor of -0.5, might have +3 SOC, giving them +2.5 for beseeching the gods. This would mean that on rare occasions, such a mother with +2 CON could cure her child’s illness from prayer alone.
+
+
+
+Chapter 5: Magic:
+Spells: 
+Casting a spell requires touching a set of runes, channeling mana into them, and succeeding at an Evoke Runes check: DC 1+3m if it’s a “learned” spell, or DC 20+3m if it’s an unlearned spell, where m is the spell’s unmodified mana cost. You have N learned spells at a time, where N equals your knowledge (magic) bonus.
+
+N is set every long rest, based on its minimum value during that entire long rest. When N is temporarily increased (e.g. via Headband of the Mind), you choose to learn new spells equal to that increase, which are the same ones you unlearn if that increase goes away. The reverse is also true (e.g. via minor skill loss amnesia) in that you choose which spells to lose when you lose them, and you gain those same spells back if that decrease goes away. If you level up, you may rearrange these assignments. At level up, you learn new spells equal to the increase in N, and can also swap out floor(N / 4) spells. 
+
+You may have spells in your "learned" set as long as you know the spell exists, but of course you still need runes to cast them. You may choose to learn fewer spells than you are able to, but you cannot fill in those missing spells until your next level up. You cannot cast spells with unmodified mana cost greater than r/3, where r is your natural evoke runes bonus plus any bonus from items bound to your own mana.
+
+While the only firm requirement for being able to cast a spell is having the runes touch your skin, pointing and chanting is helpful. The evoke runes DC goes up by +15 without verbally pronouncing the spell, by +5 if the runes aren’t touching the caster’s hands, and +5 if the caster needs to point, but points with a held object / a gesture instead of pointing with a free hand or a hand holding a wand / staff / consumed scroll.  If someone lacks prewritten runes for spells, then it is effectively impossible to use magic at all in combat — runes are complex to write up quickly.
+
+Casting a spell takes an action, and possibly an Interact with an Object interaction to pull out the parchment with the desired spell written on it. The use of an Interact with an Object action can be avoided by touching the runes on tattoos or an already held wand/staff, which unlike parchment would not be destroyed after the casting. However, because magic makes the runes burn with energy, attempting to cast from runes you’ve used since the start of your last turn requires a DC 5+5*N resist pain check, where N is the number of times the runes were used since start of your last turn. On a failure, the pain is too much and the action is wasted. This means that mages who want to be casting the same spell even two turns in a row want multiple copies of the spell runes. See the Items with Runes table for costs of different rune management options.
+
+While runic tattoos can be convenient, the tattoo burns the skin underneath when mana is channeled through it, and unless the caster succeeds at a resist pain check equal to 5*N (where N is the unmodified mana cost of the spell), they have disadvantage on all skill checks until the end of their next turn. 
+Concentration Spells:
+Some spells have a long-lasting effect which requires your continued attention. Unless you have the Mystic Confluence feat, you can only concentrate on one spell at a time. If you take damage while you are concentrating on a spell, make a resist pain check with DC equal to 5 plus ½ of the damage taken. On a failure, you lose concentration and the spell ends.
+ List of Common Spells:
+This list is not exhaustive; different spells may be more common in different areas, and you can find a number of new pre-created spells in your travels. Spells with the same effects do not stack. DCs for spells are equal to 8 + your evoke runes modifier. Attack bonuses for spells are the same as your evoke runes modifier. 
+
+The list of common spells can be found here.
+Runic Complexity (RC):
+
+Spells vary in complexity, i.e. how many runes are in them. An individual rune is written as if it were on an 8x8 grid (technically speaking the rune itself is 6x6 and the area surrounding it is grammar, but the surrounding grammar is always required in a spell). Practically speaking, people cannot write a rune in an area smaller than a 1 inch square, and typically any fast writing will be even larger. Runic complexity is often described with a number, such that 1 means 1-3 runes, 2 means 4-8 runes, 3 means 9-15 runes, 4 means 16-24 runes, etc. Spells are written in squares if possible, and squarish rectangles if not. Less squarish spells typically produce a weaker effect.
+
+This means that a 6 foot tall, 1 inch diameter mage’s staff could hold ~216 runes, though it might not be able to hold spells with runic complexity greater than 3. In practice though, too many spells and runes for different spells being too close together would be confusing in combat, so “10 spells” is the more typical limit. A 1 foot wand would hold ~24 runes, subject to the same restrictions. Some mages prefer using less traditional items, such as large flat sheets of metal, but often these behave like shields for the purpose of spell failure rate (but without providing any additional protection). 
+
+For the most part, mages are content with the flexibility and lack of size restrictions that come with using parchment. They keep copies of the same spell on multiple pieces of parchment but within the same pocket. Pockets made for spell scrolls are lined with resilient material meant to keep the parchment safe; between that and the magical resilience of surfaces with runes, mages can take several fireballs without their spell parchment suffering damage.
+
+Sometimes, high-end magic stores will produce even smaller runes, by casting an enlarge spell on the object and a reduce spell on the inscriber, getting a rune down to ¼ inch per side. Such inscriptions are more costly. Smaller runes than that tend to be illegible, which is undesirable.
+
+To carve runes onto an item yourself, you must make a problem solving check for each spell you inscribe, as shown on the table. If you fail, you consume the space on the material with a non-functional inscription.
+
+Material
+Necessary Item
+Time Taken
+Problem Solving DC
+Wood
+Woodcarver’s Tools
+[RC]^2 minutes
+[RC]
+Leather / Hide
+Leatherworker’s Tools
+3*[RC]^2 minutes
+3*[RC]
+Metal
+Smith’s Tools
+5*[RC]^2 minutes
+5*[RC]
+
+
+To carve runes onto a magic item, you must first use the Magic Item Suppression Ritual.
+Rituals:
+
+“Ritual” is a generic name for a magical process that takes a long time (at least a minute, but commonly hours and occasionally even days). Sometimes this is because the runes involved cannot be pre-written, due to needing to be written on a specific surface, or due to needing to be tailored to a particular situation. Other times a ritual requires particular steps other than simply evoking runes, or particular expensive reagents. Sometimes a ritual can only be done via a certain feat (such as Creature Bond), but for the most part, a ritual is done by following a series of instructions, usually involving a lot of writing runes and channeling mana. 
+
+Some examples of rituals:
+Creating a magic square through which certain types of creatures may not pass. The square must be inscribed onto the ground, and the runes are customized based on the thoroughness of the binding and the types of creatures being bound.
+Creating or using a teleportation circle. This is not actually circular, but it is almost so, and must be inscribed onto the ground.
+Summoning or banishing a devil, demon, or other non-native creature. The runes here must be written on the ground around the creature (usually requiring them to be trapped in a magic square or the prayer equivalent), as well as tailored to the creature and specific circumstances. Usually though, killing the creature would do just as well as banishing.
+Creating or destroying a portal to another plane. Runes here must be inscribed on the ground and keyed to a particular location. Generally destroying a portal is not possible without seeing the runes that created the portal.
+Scrying. This requires an expensive scrying focus, as well as a period of time focused on the target. Particular items or body parts of the target can aid the process.
+Private Sanctum
+Continual Flame
+Magic Mouth
+Clairvoyance
+Glyph of Warding
+Tiny Servant
+Fabricate
+Creation
+Magic Item Suppression
+
+Rituals are typically quite complicated, requiring either extensive personal research or a reference book to cast them from. 
+
+
+Chapter 6: Items:
+Equipment:
+Weapon Properties:
+Heavy: require two hands, +1 damage per +1.5 melee weapon bonus. Require +4 strength to use.
+Medium: one handed, +1 damage per +2 melee weapon bonus. Require +2 strength to use.
+Light: one handed, +1 damage per +3 melee weapon bonus. After you make an attack with a melee light weapon, you may make another attack with a melee light weapon in your other hand as part of the same Attack action (unlike in 5e, the second attack does not require a bonus action).
+Finesse: can be used for rogue sneak attacks
+Reach: 10 feet of reach rather than 5 feet
+Unarmed: see name; 1 damage by default
+Natural: weapons that aren’t something humans generally have; note that these are distinct from unarmed strikes
+Ranged: see name. Disadvantage on attacks when an enemy is within 5 feet of you.
+Silver: Any metal weapon can be made out of silver (which makes it more expensive). Silver is more effective against some enemies.
+Adamantine: Any metal weapon can be made out of adamantine (which makes it more expensive). Weapon bypasses 1 physical DR from armor if light, 2 if medium, or 3 if heavy
+Weapon List:
+Greataxe, Greatsword, Maul: Heavy. Deal 2d6 damage, cost 30 gp, weigh 6 lb. Greataxes and greatswords deal slashing damage while mauls deal bludgeoning damage.
+Glaive, Halberd, Pike: Heavy, Reach. Deal 1d10 damage, cost 20 gp, weigh 6 lb. Glaives and halberds deal slashing damage while pikes deal piercing damage.
+Longsword, Battleaxe, War Pick, Morningstar, Rapier, Flail, Warhammer: Medium (Rapiers have finesse). Deal 1d8 damage, cost 15 gp, weigh 3 lb. Longswords and battleaxes deal slashing damage, war picks, morningstars, and rapiers deal piercing damage, and flails and warhammers deal bludgeoning damage. 
+Scimitar, Shortsword: Light, Finesse. 1d6 damage each, cost 15 gp each, weigh 2 lb each. Scimitars deal slashing damage while shortswords deal piercing damage.
+Staff: Medium. 1d6 damage or 1d8 damage with two hands. Cost 5 gp, weigh 4 lb, deal bludgeoning damage.
+Dagger: Light, Finesse. 1d4 damage each, cost 2gp, weigh 1 lb each, deal piercing damage.
+Whip: Reach, Medium, Finesse. 1d4 damage, cost 2 gp, weigh 3 lb, deal slashing damage.
+Longbows (use arrows): Ranged. deal 1d8 damage up to 150 feet away (up to 600 feet away with disadvantage), require two hands, cost 50 gp, weigh 2 lb, deal piercing damage.
+Crossbows (use bolts): Ranged. deal 1d10 damage up to 100 feet away (up to 400 feet away with disadvantage), require two hands, cost 50 gp, weigh 18 lb, deal piercing damage. Cannot benefit from the Rapid Shot feat.
+Improvised weapons: deal 1d4 damage; can be light, medium, or heavy depending on the object
+Claws: Light, Finesse, Natural. Humans do not have claws. But if they did, they would deal 1d4 damage each. They deal slashing damage.
+Tentacles: Light, Reach, Natural. Humans do not have tentacles. But if they did, they would deal 1d4 damage each. They deal bludgeoning damage. Tentacles can also be used for grappling or shoving in place of one of the attacks, which happens at reach and doesn’t take a free hand (it obviously does use the tentacle). If you grapple someone with your tentacles, they can attack those tentacles (they don’t need to get in reach of you). 
+Equipment Slots
+Each person has the following equipment slots:
+Helm: for helmets, hoods, hats, and circlets
+Glasses: for glasses, spectacles, and goggles
+Necklace: for amulets, periapts, pendants, and necklaces
+Cloak: for cloaks
+Body: for armor and robes
+Gloves: for gauntlets, bracers, and gloves
+Ring: for rings
+Ring: another slot for rings
+Belt: for belts
+Boots: for boots, shoes, and slippers
+You can only have one item at a time in any given slot.
+
+Additionally, you have two hands. Weapons that require two hands to use can still be held in one hand when not used. Spellcasting typically needs a hand to point and a hand to be touching the runes; if you’re casting from parchment or a wand, these can be the same hand. Runes on a staff or the hilt of a melee weapon can be touched by the hand wielding it, but runes on a shield or ranged weapon cannot. Drawing/stowing a weapon or parchment is an Interact with an Object action. 
+Armor:
+By default, your AC (armor class) is 10. There are several things that modify your AC: armor bonus from armor and armor-like effects, shield bonus from a shield, dodge bonus from the dodge skill, natural armor bonus from e.g. tough skin, deflection bonus from several magical effects, size bonus, and circumstance bonus from e.g. having cover. AC bonuses of the same type do not stack. Typeless AC stacks with itself and any other type of AC.
+
+Armor also gives you damage resistance to bludgeoning, piercing, and slashing damage, except for damage from falling. If you have DR X, you ignore the first X damage from a source. So if you have DR 5 physical, and you get stabbed for 20 damage, you would only take 15 of it. On the other hand, if you were stabbed twice for 10 damage, you would take 5 damage from each (for a total of 10 damage). Damage resistance is applied after any other effects, such as Uncanny Dodge, Evasion, or succeeding saving throws.
+
+The following table details the properties of various types of armor. Confusing properties include:
+Type: Shield, Light Armor, Medium Armor, or Heavy Armor. 
+Light armor damage resistance increases by 1 for every +5 bonus in the resist damage skill
+Medium armor damage resistance increases by 1 for every +4 bonus in the resist damage skill
+Heavy armor damage resistance increases by 1 for every +3 bonus in the resist damage  skill
+A/SB (Armor/Shield Bonus): How much of an AC bonus the armor or shield gives.
+MDAB (Maximum Dodge AC Bonus): The maximum bonus to the dodge AC one can have while wearing the armor. If your dodge AC bonus is higher, it is treated as being the MDAB instead while wearing the armor. Note that every +3 bonus in the dodge skill gives +1 AC.
+RSSB (Required Strength Skill Bonus): How high of a bonus in the strength skill you need to have in order to wear the armor.
+ISDC (Italicized Skill Difficulty Check): When you make a skill check using an italicized skill, you must first pass a strength skill check of this DC or else you auto-fail the check. This notably includes even “trivial” evoke runes checks, and thus ISDC effectively also measures spell failure rate. If you have both armor and a shield, the ISDC is the max of the two.
+
+
+Name
+Type
+A/SB
+MDAB
+RSSB
+ISDC
+Weight 
+Price 
+Metal?
+Padded
+Light
+1
++10
++1
+2
+10 lb
+5 gp
+no
+Leather
+Light
+2
++8
++2
+3
+15 lb
+10 gp
+no
+Studded Leather
+Light
+3
++6
++3
+4
+20 lb
+25 gp
+no
+Chain Shirt
+Light
+4
++5
++4
+8
+25 lb
+100 gp
+yes
+Hide
+Medium
+3
++4
++2
+9
+25 lb
+15 gp
+no
+Scale Mail
+Medium
+4
++3
++3
+10
+30 lb
+50 gp
+maybe
+Chainmail
+Medium
+5
++2
++5
+15
+40 lb
+150 gp
+yes
+Breastplate
+Medium
+5
++4
++3
+10
+30 lb
+250 gp
+yes
+Splint Mail
+Heavy
+6
++0
++5
+25
+45 lb
+200 gp
+yes
+Banded Mail
+Heavy
+6
++0
++3
+15
+35 lb
+250 gp
+yes
+Half Plate
+Heavy
+7
++0
++6
+25
+50 lb
+600 gp
+yes
+Full Plate
+Heavy
+8
++1
++8
+20
+50 lb
+1500 gp
+yes
+Light Shield
+Shield
+1
++16
++2
+2
+5 lb
+10 gp
+maybe
+Heavy Shield
+Shield
+2
++10
++4
+12
+12 lb
+20 gp
+maybe
+Tower Shield
+Shield
+4
++2
++6
+30
+45 lb
+30 gp
+yes
+
+
+Potions and Poisons:
+
+Making a potion or poison requires both finding ingredients and crafting them. Many common ingredients can be bought in stores, though stores aren’t guaranteed to have all of them. Unlike normal items, which can be sold for half their base price, ingredients can only be sold back to stores at 1/10 price.
+
+Alternatively, ingredients can be found from wilderness exploration. Wilderness exploration can be done up to twice a day, and a given attempt takes at least one hour. Wilderness exploration to find ingredients takes two survival checks: one to determine if you find anything, and one to determine if you take negative effects from the dangers of the region. For a typical region, both DCs would be 15. A DC 12 knowledge (biology) check can inform you if your specific region has different survival DCs than usual. See the Failed Survival Checks tab for the consequences of failing the safety survival check.
+
+When you find an ingredient, the DM secretly rolls a d20. On a 1-12, you find a common ingredient; 13-17, an uncommon one; 18-19, a rare one; 20, a very rare one. Unless you are quite familiar with the ingredient type already, identifying it is a knowledge (biology) check. You can also try to look for one ingredient in particular during your exploration. Doing so requires that you first succeed on the knowledge (biology) check to identify the ingredient, and it increases the DC of the locating survival check by +3 for common ingredients, +6 for uncommon ingredients, +12 for rare ingredients, and +18 for very rare ingredients. 
+
+Storing ingredients requires a herbalism kit, otherwise the ingredients go bad after one day. Crafting a potion or poison from them can be done twice per day and requires an alchemy kit and a knowledge (biology) check. The DC is the sum of the Craft DC modifiers for the ingredients (you can stack the same ingredient). The process of attempting to craft a potion/poison takes 1 hour, and consumes the ingredients whether or not it is successful. 
+
+All potions/poisons need a base ingredient. This is always Elfroot for potions, and one of Apple Seeds, Moonflower Oil, Nightbloom Powder, or Snakeleaf for poisons (depending on the type). To make a basic healing potion (healing 2d4 hp), for instance, you’d need to combine Elfroot with Wild Sageroot and then succeed on a DC 10 knowledge (biology) check.
+
+Injury poison applied to a weapon retains its potency for 10 minutes unless it is delivered or washed off. Contact poison lasts until brushed off the item, inhalation poison lasts for 1 round once released, and ingestion poison lasts until eaten. These are all defaults and certain ingredients can alter those properties. 
+
+Coating a slashing/piercing melee weapon or coating 3 pieces of ammunition takes an action and uses up the vial of poison. Poison saves are always resist condition checks. You can only have one type of poison applied to a weapon at any given time.
+
+Most potions and many poisons detect as being magical, although making and using them does not count as magic for the purpose of divine favor.
+
+The list of all well-known potion/poison ingredients can be found in the appropriate table here. Other ingredients may exist.
+Magic Items:
+List of Common Magic Items:
+Can be found on the Magic/Expensive Items tab. Not all stores will have all the items listed, especially the ones in smaller cities. Conversely, stores may sell items not listed here.
+Creating Magic Items:
+To create a magic item, you first need to figure out what runes should be applied to the item. The runes on a magic item are not “castable” — it’s linguistically nonsensical, even if many magic items essentially are just spells applied to items and the runes are derived from a particular spell. The runic complexity for magic items is typically higher than for spells.
+
+You’ll also need a mana source. If your mana source produces more mana than the effect you want, you can opt to bind only part of its mana. You can purchase a mana source in a jewelry shop, find one in your travels, deconstruct another magic item, or use a (willing) person as a mana source. Here are examples of common mana source prices (gems needed are large: 1” by default):
+
+
+Name
+Mana
+Price
+citrine
+1
+200 gp
+garnet
+2
+600 gp
+amethyst
+3
+1200 gp
+topaz
+4
+2000 gp
+opal
+5
+3000 gp
+corundum
+6
+4200 gp
+ruby
+7
+5600 gp
+sapphire
+8
+7200 gp
+emerald
+9
+9000 gp
+diamond
+10
+11,000 gp
+blue diamond
+11
+13,200 gp
+
+
+
+Next, you need to actually produce the item, inscribe the runes onto it, and optionally physically attach a mana source. You can probably ask the local blacksmith, jewelrymaker, tailor, etc to do this for a fee, if you can’t do it yourself. If you’re going with the tailor option, make sure you’ve included protection runes, or the burning energy of the magic might destroy all your hard work! Note that if the source and item become separated, unbinding either is also harder.
+
+Now, you need to bind the mana source to the item via ley weaving. Find a ley loom (available to rent at many magic item shops) and you can begin to work. In order to create a magic item that is bound to N mana, you’ll need to succeed on a DC 15+2*N Craft Magic Items check. You can make such a check after every 8-hour block you spend ley weaving. If you’re using a person as a mana source, they must be present and participating for all of this (though their participation does not require any skill checks). For unknown reasons, certain items pair better with certain effects than others (e.g. a +dodge enchantment might work better on boots, a +knowledge enchantment might work better on a headband, etc). The DC of the Craft Magic Items check on such well-paired items is lower, -5 by default.
+
+It’s possible to bind multiple mana sources to an item to fuel its mana requirement. This is necessary for particularly powerful items, but can also be convenient for saving money on mana sources. However, using multiple mana sources is harder; for each extra mana source used, the DC for the Craft Magic Items check increases by 20 and you add another d20 to your roll.
+
+Alternatively, if you’re not up for weaving yourself, you could hire someone to work on it (hired weavers will charge overtime if they work for more than 8 hours per day). The costs of the weaving in various circumstances are as follows (CMI = Craft Magic Items):
+
+Item or Service
+Price
+8 hour renting the use of a ley loom
+20 gp
+Hiring +N CMI bonus weaver for 8 hours (3<=N<=15)
+(1+(N-3)^2) gp (or half this much if they don’t have the Prodigal Sorcerer feat) + costs of loom use
+Buying a ley loom (3’ x 3’ 80 lb machine)
+10,000 gp
+
+
+Finally, once the mana source is bound to the item, 2*N mana (where N is the amount of mana bound to the item) must be spent in order to activate it. This must be spent by someone physically touching the item and channeling their mana into it; it can also be done by multiple people simultaneously.
+
+Now you’ve made your very own magic item! If you want to unbind it (or any other item) from its mana source(s), it’s a DC 3*N Craft Magic Items check, regardless of number of mana sources, after each hour spent with a ley loom. Disenchanting cursed items is more difficult (a DC 5*N Craft Magic Items check). +10 DC to unbind an item or a mana source if you do not have the other physically present. Unbinding just the item without the mana source does not cause the mana source to recover its mana; it must also be unbound, possibly later, to get the mana back.
+
+Physically separating a mana source and a magic item once they are ley woven together is inadvisable. After ~200 ft apart, the item starts malfunctioning. After 1000 ft apart, the item stops working all together. After 5000 ft apart, the item permanently ceases to be magical—any attempt to unbind the mana source must be done as if you didn’t have the item present (+10 DC).  
+Creating Constructs
+Constructs are more difficult to create than typical magic items. Making one requires the following steps (many of these can be parallelized to some degree):
+Read an appropriate manual to learn the blueprint for the construct. Fully understanding the manual requires 20 successful Problem Solving checks, with one check per hour reading. The DC is 25-40, depending on the complexity of the construct. The manual describes the specific details of later steps.
+Acquire the appropriate raw materials. These are fairly substantial in price, though much less than the cost for the mana sources in step 4. For instance, a clay golem requires 1500 gp in clay and special oils. 
+Shape the materials into the appropriate form for the construct. This takes 4 hours per 1 HP of the construct, with a DC 12 problem solving check to accomplish successfully. This step includes inscribing the necessary runes (which are generally extremely large in complexity). 
+Bind the mana sources to the construct. Each construct has 6 separate mana sources (4 for the limbs, 1 for the torso, and 1 for the head), with separate craft magic item checks for each part. This means the most minimal humanoid-looking constructs use at least 6 mana total, though a complex one like a clay golem would use 6 instances adding up to 9 mana each. The mana sources must be earthen in nature, e.g. gems. Once the construct is completed, the mana sources will be consumed by it, and will not later be able to be unbound.
+Cast the spell “Animate Objects” on the golem to have it absorb the mana sources and come to life. The caster in this final step is considered by the golem to be the creator (other steps can be offloaded to others).
+
+Constructs recover ¼ HP after long rests just as other creatures do. Someone can also expend 5 sp of appropriate materials and 1 hour of time to repair the construct by 2d6 HP on a successful DC 15 problem solving check. The construct can also be repaired by an appropriate prayer (standard mending prayer repairs 1 HP, but it must be expanded to repair the full amount). Destroyed constructs are not recoverable (though using them in the construction of a new construct saves on craft time). 
+
+Most constructs do nothing without orders from their creators, following instructions explicitly and without any strategy or tactics. They are emotionless in combat and cannot be provoked. Specific behaviors can be programmed in during the construct’s creation, though this requires precise and complex runic inscriptions.
+
+A construct’s creator can command it if the construct is within 60 feet and can see and hear its creator. If uncommanded, a construct usually follows its last instruction to the best of its ability, though if attacked it returns the attack. The creator can give constructs simple commands to govern their actions in her absence. The construct’s creator can order the construct to obey the commands of another person (who might in turn place the construct under someone else’s control, and so on), but the construct’s creator can always resume control over her creation by commanding the construct to obey her alone.
+
+Tattooing Enchantments:
+Typically, tattoos of runes are done as a substitute for the parchment used in spellcasting; you can’t lose or be disarmed of a tattoo like you could parchment, it doesn’t get used up, and for stealthy spellcasters it’s easier than trying to tape parchment to yourself. 
+
+However, it’s also possible to enchant oneself via a tattoo, effectively making yourself a magic item (likely using your own mana pool as the mana source). Again, unlike an item, your own body is something that you can’t lose or be disarmed of, and it’s potentially more subtle. But while spellcasting runes are common enough to tattoo (used by maybe 10-20% of mages), tattooed enchantments are far rarer, even though they’re more applicable for non-mages. This is because rather than simply being painful during spellcasting, a tattooed enchantment is painful all the time. Every hour while you have a tattooed enchantment on yourself, you must make a DC 5 + N resist pain check, where N is the number of mana bound in the enchantment; if you fail, you have disadvantage on all skill checks that hour. 
+
+Artifacts and other Unique Items:
+
+Not all items and enchantments can be easily replicated. Items made with components from magical creatures (such as dragon scale mail) are an obvious case. Another case is items that have been permanently blessed by the gods, usually as a result of their wielder accomplishing some heroic deed. Blessed items detect as being magical, though using ones blessed by the gods above of course does not cause a divine favor penalty. Blessed items also often resist anti-magic fields. 
+
+Cursed items are sometimes generated from particularly angering the gods, but can also come about in a much greater variety of ways than blessed items. One frequent aspect of cursed items is that they are difficult to unequip, either because they physically stick to their equipment slot or because they are enchanted to make their wielder not want to part with them. Beseeching the gods is the most common way to remove cursed items, followed by casting an appropriately leveled Dispel Magic. Destroying the item is also an option, if possible. In some cases, wildshape or a Reduce spell may be effective. Other more creative methods of getting rid of cursed items are possible as well. Permanently uncursing the item, rather than simply unequipping / discarding it, is not possible to do in any consistent way. 
+
+Not all cursed items are difficult to unequip, and in such cases a curse may lie undetected, as there is no foolproof way to detect a cursed item. However, permanent item curses tend not to be acquired subtly. You’d almost certainly notice something that cursed an item you were using. You can also typically expect magic items sold in legitimate stores to not be cursed; items found in ancient tombs, maybe not.
+
+“Artifact” is a generic term for powerful, unique items (often blessed items, but not necessarily). Some are simply created when powerful mages craft an item and include an anti-plagiarism enchantment to conceal the runes from mundane or magical detection. Sentient items are also artifacts. Using sentient items sometimes imposes a divine favor penalty, as many are made from dark mages imprisoning a soul in an item.
+
+Changelog since Shadows Over Nekromia Arc 2
+Lowered Spell Burst prereq to 4 metamagic feats and 16 knowledge (magic).
+Added AoOs to Fierce Guardianship.
+Made Slow Fall and Chosen of Bastet cause you to land on your feet.
+Let dark arts familiars feats use Bond of Insight as prereq
+Lowered level requirements for Legendary Action feats
+Buffed Rebuke Maneuver
+Buffed Protector and Avenger feats, allowed Protector and Anti-Magic Shield reactions to be used with Tank.
+Made the Mage Armor spells last 24 hours.
+Buffed Snap Shot and modded Point Blank Shot.
+Remove Great Cleave prereq.
+Decreased Master of Sneak, Master of Deceit, Delay, Illusionist’s Strategem, Rapid Shot prereqs.
+Buffed Ambush Maneuver.
+Made Spell Contortion a minor feat.
+Buffed Apex of Power, Power Surge, Accumulated Knowledge.
+Buffed Holy Plea, Shared Blessings, Aura of Light I, Aura of Light II.
+Modded Shots of Faith.
+Changed some bonuses for cleric feats.
+Turned Taunt / Improved Taunt into a maneuver + Improved Provoke (rogue) feat
+Changelog for v3.5
+Made multiattack penalty -6 instead of -5, made it give a minor feat instead of +1 HP
+Made Power Attack give +2 HP instead of a minor feat
+Made rogues specialized in health pool skill instead of clerics. Made rogues specialized in melee weapons instead of clerics. Made rogues specialized in knowledge (bio) instead of clerics. Made clerics specialized in strength and endurance. 
+Swapped the rider effect of Arcane Savant with the resistance piercing of Elemental Blast
+Made Forceful Shots a “you may” effect
+Removed +1 HP from Maneuverable Armor
+Made Dodge +1 AC per 3 points in dodge (adjust wildshape and familiar tables accordingly, made Agility +3 Dodge and +3 Athletics)
+Muddle the Mixture changed entirely, becoming “When you use multiple metamagics on the same spell, ignore the lowest mana multiplier.”
+Made Powerful Presence only give half Strength, but also apply to Assertive Willpower
+Buffed Athlete, Sure-Footed, Unstoppable
+Made True Grit takable by mages and buffed it
+Moved Rebound into being a monk maneuver
+Gave more maneuvers the duelist tag
+Let paladin maneuvers use humility
+Made Holy Warrior and Lucky Hit give only humility
+Combined BTG skills
+Lowered DC for animal wildshape’s +1 CR overpray
+Added Mixed Attacker feat
+Buffed Fast Hands to allow administering potions as a bonus action
+Made Monk feats rogue feats
+Made a proficiency swap for wildshape 1
+Gave mages instead of fighters dodge proficiency
+Gave fighters perception and interact with nature proficiency
+Modified Magical Ambush
+Removed melee specialization from Swashbuckler feat
+Gave perform specialization to Wizard’s Retort and resist damage specialization to Reaper
+Gave delay effect to Corrupted Conscience
+Made Deny the Divine a minor feat that requires Counterspell
+Expanded range of Acid Rain, modded Synaptic Static
+Added Mental Prison, Empathic Feedback, Enthrall spells
+Decreased Precognition and Inspired by the Gods prereqs
+Buffed Animate Objects
+Made Psionic Ritual a minor feat
+Lowered Story of Creation mana cost
+Buffed Story of Creation II
+Split Select Indulgences into Anti-Magic Indulgences and Runic Conversion and modded both.
+Buffed Paradigm Shift
+Modded Vow of Silence
+Added Duel Nature feat
+Buffed Draconic Warding, Berserker, Draconic Breath Weapon, Draconic Conflux
+Buffed Psychic Strike
+Modded Exploit Weakness
+Added craft DC limit for blood hunters
+Increased bound mana of some items
+Modded Smite Evil, Infliction of Justice, and Guiding Bolt to work better with Smiter of Evil overpraying; modded Smiter of Evil to overpray properly with multiple damage types
+Decreased DC and mana of Guardian of Faith
+Compensated wildshapes for multiattack nerf
+Added Green Wyrm’s Gasp, Caustic Spray, Arc of Lightning, Witch Bolt, Enhance Venom, Contagion
+Buffed Flaming Sphere and Call Lightning
+Made Draconic Conflux work with Green Wyrm’s Gasp instead of Poison Spray
+Made Neutralize dismissable, modded Summon Lesser Demons
+Buffed Blight
+Added Ardent Acolyte feat
+Modded Aquatic Affinity
+Added Dual Reflexes maneuver
+Made Earthbind use Endurance
+Slightly modded Bottled Luck
+Buffed Spiritual Weapon
+Buffed Mirror Image and moved it to lvl 3
+Made Forceful Shots make weapon magical
+Made Divination + Commune timeouts 1 week instead of 1 day
+Made Polearm Master give Brace maneuver
+Let Fierce Guardianship familiars attack if master is incapacitated
+Made Lucky Hit instead of Holy Warrior prereq for Avenger
+Made Wings of an Angel restriction apply to metal armor rather than medium/heavy
+Made mithril armor decrease RSSB by 2
+Made undead familiars not deal HP damage upon reaching 0, but not usually healable
