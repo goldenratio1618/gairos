@@ -16,6 +16,7 @@ const TERRAIN_BLOCKERS = new Set(["stone_wall", "wooden_wall", "window"]);
 const HERB_SHEET_ID = "1_ly4-3ykWpQ47oDLyF2hDewntCJ4QR6hImODhmwNlYg";
 const HERB_SHEET_NAME = "RULES_HERBS";
 const MAX_MAP_BACKGROUND_DATA_URL_LENGTH = 10_000_000;
+const DEFAULT_GM_TOKEN_OPACITY = 0.55;
 
 const ROLL_MODIFIER_CATALOG = {
   guidance: {
@@ -249,6 +250,39 @@ function normalizeFeatName(name) {
 function normalizeFeatSet(feats) {
   const source = Array.isArray(feats) ? feats : [];
   return new Set(source.map((feat) => normalizeFeatName(feat)).filter(Boolean));
+}
+
+function normalizeEntityName(name) {
+  return String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function hasEntityNameCollision(entries, wantedName, ignoreId = null) {
+  const wanted = normalizeEntityName(wantedName);
+  if (!wanted) {
+    return false;
+  }
+  return (Array.isArray(entries) ? entries : []).some((entry) => {
+    if (!entry || (ignoreId && entry.id === ignoreId)) {
+      return false;
+    }
+    return normalizeEntityName(entry.name) === wanted;
+  });
+}
+
+function nextUniqueEntityName(entries, prefix) {
+  const safePrefix = String(prefix || "New").trim() || "New";
+  let index = 1;
+  while (index < 5000) {
+    const wanted = `${safePrefix} ${index}`;
+    if (!hasEntityNameCollision(entries, wanted)) {
+      return wanted;
+    }
+    index += 1;
+  }
+  return `${safePrefix} ${Date.now()}`;
 }
 
 function createId(prefix) {
@@ -853,16 +887,56 @@ function makeEmptyGrid(rows, cols) {
   return grid;
 }
 
+function resizeTerrainGrid(existingTerrain, rows, cols) {
+  const resized = [];
+  const source = Array.isArray(existingTerrain) ? existingTerrain : [];
+  for (let y = 0; y < rows; y += 1) {
+    const nextRow = [];
+    const sourceRow = Array.isArray(source[y]) ? source[y] : [];
+    for (let x = 0; x < cols; x += 1) {
+      const sourceCell = sourceRow[x] && typeof sourceRow[x] === "object" ? sourceRow[x] : null;
+      nextRow.push({
+        ...DEFAULT_CELL,
+        ...(sourceCell || {}),
+        specialType: null,
+      });
+    }
+    resized.push(nextRow);
+  }
+  return resized;
+}
+
+function resizeMapInPlace(map, rows, cols) {
+  if (!map) {
+    return;
+  }
+  const nextRows = clamp(Number.parseInt(rows, 10) || map.rows || DEFAULT_GRID_ROWS, 5, 80);
+  const nextCols = clamp(Number.parseInt(cols, 10) || map.cols || DEFAULT_GRID_COLS, 5, 80);
+  if (map.rows === nextRows && map.cols === nextCols) {
+    return;
+  }
+  map.terrain = resizeTerrainGrid(map.terrain, nextRows, nextCols);
+  map.rows = nextRows;
+  map.cols = nextCols;
+  if (Array.isArray(map.tokens)) {
+    map.tokens.forEach((token) => {
+      token.x = clamp(Number.parseInt(token.x, 10) || 0, 0, nextCols - 1);
+      token.y = clamp(Number.parseInt(token.y, 10) || 0, 0, nextRows - 1);
+    });
+  }
+}
+
 function createMap({ name, rows, cols, feetPerCell = 5 }) {
   const safeRows = clamp(Number.parseInt(rows, 10) || DEFAULT_GRID_ROWS, 5, 80);
   const safeCols = clamp(Number.parseInt(cols, 10) || DEFAULT_GRID_COLS, 5, 80);
   const safeFeetPerCell = clamp(Number.parseFloat(feetPerCell) || 5, 1, 200);
   return {
     id: createId("map"),
-    name: String(name || "New Battlemap").slice(0, 120),
+    name: String(name || "New Map").slice(0, 120),
     rows: safeRows,
     cols: safeCols,
     feetPerCell: safeFeetPerCell,
+    gmTokenOpacity: DEFAULT_GM_TOKEN_OPACITY,
     scenarioType: "standard",
     background: {
       imageDataUrl: "",
@@ -1279,6 +1353,10 @@ function normalizeMapShape(map) {
   if (!Number.isFinite(map.feetPerCell) || Number(map.feetPerCell) <= 0) {
     map.feetPerCell = 5;
   }
+  map.gmTokenOpacity = clamp(Number.parseFloat(map.gmTokenOpacity), 0.1, 1);
+  if (!Number.isFinite(map.gmTokenOpacity)) {
+    map.gmTokenOpacity = DEFAULT_GM_TOKEN_OPACITY;
+  }
   if (!map.background || typeof map.background !== "object") {
     map.background = { imageDataUrl: "" };
   }
@@ -1301,6 +1379,13 @@ function normalizeMapShape(map) {
   }
   if (!Array.isArray(map.drawings)) {
     map.drawings = [];
+  } else {
+    map.drawings = map.drawings
+      .filter((drawing) => drawing && typeof drawing === "object")
+      .map((drawing) => ({
+        ...drawing,
+        layer: drawing.layer === "gm" ? "gm" : "tokens",
+      }));
   }
   return map;
 }
@@ -1523,6 +1608,9 @@ function sanitizedMapForRole(map, role) {
   const cloned = deepClone(map);
   if (role !== "dm") {
     cloned.tokens = cloned.tokens.filter((token) => token.layer !== "gm");
+    cloned.drawings = (Array.isArray(cloned.drawings) ? cloned.drawings : []).filter(
+      (drawing) => drawing.layer !== "gm"
+    );
     cloned.terrain = cloned.terrain.map((row) =>
       row.map((cell) => {
         const safe = { ...cell };
@@ -1793,6 +1881,9 @@ function createTabletopSystem(io, options = {}) {
         rows: candidate.rows,
         cols: candidate.cols,
         feetPerCell: Number(candidate.feetPerCell) || 5,
+        gmTokenOpacity: Number.isFinite(Number(candidate.gmTokenOpacity))
+          ? clamp(Number(candidate.gmTokenOpacity), 0.1, 1)
+          : DEFAULT_GM_TOKEN_OPACITY,
         scenarioType: candidate.scenarioType || "standard",
         updatedAt: candidate.updatedAt,
       })),
@@ -2537,6 +2628,57 @@ function createTabletopSystem(io, options = {}) {
       broadcastSnapshots();
     });
 
+    socket.on("campaign:delete", (payload) => {
+      if (!requireAuth(socket)) {
+        return;
+      }
+      const campaignId = String((payload && payload.campaignId) || "");
+      const campaign = findCampaignById(campaignId);
+      if (!campaign) {
+        socket.emit("tabletop:error", { message: "Campaign not found." });
+        return;
+      }
+      if (!campaign.dmUserId || campaign.dmUserId !== socket.data.user.id) {
+        socket.emit("tabletop:error", { message: "Only the DM can delete this campaign." });
+        return;
+      }
+      if (state.campaigns.length <= 1) {
+        socket.emit("tabletop:error", { message: "At least one campaign must remain." });
+        return;
+      }
+
+      const index = state.campaigns.findIndex((entry) => entry.id === campaignId);
+      if (index < 0) {
+        socket.emit("tabletop:error", { message: "Campaign not found." });
+        return;
+      }
+
+      const [deletedCampaign] = state.campaigns.splice(index, 1);
+      const fallbackCampaign = state.campaigns[0] || null;
+
+      for (const connected of namespace.sockets.values()) {
+        if (!connected.data || connected.data.campaignId !== campaignId) {
+          continue;
+        }
+        connected.data.campaignId = fallbackCampaign ? fallbackCampaign.id : null;
+        ensureSocketCampaign(connected);
+        const session = sessionForSocket(connected);
+        if (session) {
+          session.campaignId = connected.data.campaignId;
+        }
+      }
+
+      if (fallbackCampaign) {
+        appendSystemLog(
+          fallbackCampaign,
+          socket,
+          `${socket.data.user.username} deleted campaign ${deletedCampaign.name}.`
+        );
+      }
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
     socket.on("character:save", async (payload) => {
       if (!requireAuth(socket)) {
         return;
@@ -2553,6 +2695,18 @@ function createTabletopSystem(io, options = {}) {
         return;
       }
 
+      let requestedName = String((payload && payload.name) || "")
+        .trim()
+        .slice(0, 120);
+      if (!requestedName) {
+        requestedName = nextUniqueEntityName(campaign.characters, "New Character");
+      }
+      const existingId = existing ? existing.id : null;
+      if (hasEntityNameCollision(campaign.characters, requestedName, existingId)) {
+        socket.emit("tabletop:error", { message: "Character name already exists in this campaign." });
+        return;
+      }
+
       const target = existing || {
         id: createId("character"),
         ownerUserId: user.id,
@@ -2560,12 +2714,19 @@ function createTabletopSystem(io, options = {}) {
       };
 
       target.ownerUserId = existing ? existing.ownerUserId : user.id;
-      target.name = String(payload.name || "Unnamed Character").slice(0, 120);
+      const oldName = String(target.name || "").trim();
+      target.name = requestedName;
       target.tokenImage = String(payload.tokenImage || "");
+      const previousSheetUrl = String(target.sheetUrl || "").trim();
       target.sheetUrl = String(payload.sheetUrl || "").trim();
       target.updatedAt = nowIso();
+      const shouldParseSheet = Boolean(target.sheetUrl) && (
+        !existing ||
+        !target.parsedSheet ||
+        previousSheetUrl !== target.sheetUrl
+      );
 
-      if (target.sheetUrl) {
+      if (target.sheetUrl && shouldParseSheet) {
         try {
           target.parsedSheet = await parseCharacterSheet(target.sheetUrl);
           target.sheetError = null;
@@ -2594,7 +2755,7 @@ function createTabletopSystem(io, options = {}) {
             };
           }
         }
-      } else {
+      } else if (!target.sheetUrl) {
         const italicizedSkillDc = Number.parseInt(payload.italicizedSkillDc, 10) || 0;
         const strengthModifier = Number.parseInt(payload.strengthModifier, 10) || 0;
         const speed = Number.parseInt(payload.speedOverride, 10) || 30;
@@ -2626,9 +2787,11 @@ function createTabletopSystem(io, options = {}) {
 
       if (!existing) {
         campaign.characters.push(target);
+        appendSystemLog(campaign, socket, `${user.username} created character ${target.name}.`);
+      } else if (normalizeEntityName(oldName) !== normalizeEntityName(target.name)) {
+        appendSystemLog(campaign, socket, `${user.username} renamed ${oldName || "character"} to ${target.name}.`);
       }
-
-      appendSystemLog(campaign, socket, `${user.username} saved character ${target.name}.`);
+      campaign.updatedAt = nowIso();
       persistence.saveSoon();
       broadcastSnapshots();
     });
@@ -2785,8 +2948,18 @@ function createTabletopSystem(io, options = {}) {
         return;
       }
       const campaign = ensureSocketCampaign(socket);
+      let requestedName = String((payload && payload.name) || "")
+        .trim()
+        .slice(0, 120);
+      if (!requestedName) {
+        requestedName = nextUniqueEntityName(campaign.maps, "New Map");
+      }
+      if (hasEntityNameCollision(campaign.maps, requestedName)) {
+        socket.emit("tabletop:error", { message: "Map name already exists in this campaign." });
+        return;
+      }
       const map = createMap({
-        name: payload && payload.name,
+        name: requestedName,
         rows: payload && payload.rows,
         cols: payload && payload.cols,
         feetPerCell: payload && payload.feetPerCell,
@@ -2834,7 +3007,48 @@ function createTabletopSystem(io, options = {}) {
         return;
       }
       campaign.scene.activeMapId = id;
-      appendSystemLog(campaign, socket, `Loaded map ${map.name}.`);
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
+    socket.on("map:update", (payload) => {
+      if (!requireDm(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      if (!campaign) {
+        return;
+      }
+      const requestedMapId = String((payload && payload.id) || campaign.scene.activeMapId || "");
+      const map = campaign.maps.find((candidate) => candidate.id === requestedMapId) || activeMapFromCampaign(campaign);
+      if (!map) {
+        socket.emit("tabletop:error", { message: "Map not found." });
+        return;
+      }
+
+      if (payload && payload.name !== undefined) {
+        const wantedName = String(payload.name || "").trim().slice(0, 120);
+        if (!wantedName) {
+          socket.emit("tabletop:error", { message: "Map name cannot be empty." });
+          return;
+        }
+        if (hasEntityNameCollision(campaign.maps, wantedName, map.id)) {
+          socket.emit("tabletop:error", { message: "Map name already exists in this campaign." });
+          return;
+        }
+        map.name = wantedName;
+      }
+      if (payload && (payload.rows !== undefined || payload.cols !== undefined)) {
+        resizeMapInPlace(map, payload.rows !== undefined ? payload.rows : map.rows, payload.cols !== undefined ? payload.cols : map.cols);
+      }
+      if (payload && payload.feetPerCell !== undefined) {
+        map.feetPerCell = clamp(Number.parseFloat(payload.feetPerCell) || map.feetPerCell || 5, 1, 200);
+      }
+      if (payload && payload.gmTokenOpacity !== undefined) {
+        map.gmTokenOpacity = clamp(Number.parseFloat(payload.gmTokenOpacity) || DEFAULT_GM_TOKEN_OPACITY, 0.1, 1);
+      }
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
       persistence.saveSoon();
       broadcastSnapshots();
     });
@@ -2880,6 +3094,7 @@ function createTabletopSystem(io, options = {}) {
       }
       map.feetPerCell = clamp(Number.parseFloat(payload && payload.feetPerCell) || 5, 1, 200);
       map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
       persistence.saveSoon();
       broadcastSnapshots();
     });
@@ -2901,10 +3116,13 @@ function createTabletopSystem(io, options = {}) {
       }
       const color = String((payload && payload.color) || "#f3c56e").slice(0, 32);
       const data = payload && payload.data && typeof payload.data === "object" ? deepClone(payload.data) : {};
+      const role = roleForUserInCampaign(socket.data.user, campaign);
+      const layer = payload && payload.layer === "gm" && role === "dm" ? "gm" : "tokens";
       const drawing = {
         id: createId("drawing"),
         ownerUserId: socket.data.user.id,
         type,
+        layer,
         color,
         data,
         createdAt: nowIso(),

@@ -24,7 +24,9 @@ html,
 body {
   margin: 0;
   padding: 0;
+  height: 100%;
   min-height: 100%;
+  overflow: hidden;
   color: var(--text);
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   background:
@@ -34,11 +36,24 @@ body {
 
 .tt-root {
   display: grid;
-  grid-template-columns: 64px minmax(300px, 380px) 1fr minmax(260px, 340px);
+  grid-template-columns: 64px minmax(300px, 380px) minmax(0, 1fr) minmax(260px, 340px);
   grid-template-areas: "rail left main right";
   gap: 12px;
-  min-height: 100vh;
+  height: 100vh;
   padding: 12px;
+  overflow: hidden;
+}
+
+.tt-root.tt-left-collapsed {
+  grid-template-columns: 64px 0 minmax(0, 1fr) minmax(260px, 340px);
+}
+
+.tt-root.tt-right-collapsed {
+  grid-template-columns: 64px minmax(300px, 380px) minmax(0, 1fr) 84px;
+}
+
+.tt-root.tt-left-collapsed.tt-right-collapsed {
+  grid-template-columns: 64px 0 minmax(0, 1fr) 84px;
 }
 
 .tt-mode-rail {
@@ -70,6 +85,7 @@ body {
   display: grid;
   place-items: center;
   padding: 0;
+  position: relative;
 }
 
 .tt-rail-button img {
@@ -82,6 +98,32 @@ body {
   border-color: rgba(217, 164, 65, 0.85);
   box-shadow: 0 0 0 1px rgba(217, 164, 65, 0.35);
   background: rgba(30, 36, 34, 0.9);
+}
+
+.tt-rail-button[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f6e8cd;
+  background: rgba(7, 10, 9, 0.95);
+  border: 1px solid rgba(217, 164, 65, 0.68);
+  border-radius: 6px;
+  padding: 3px 7px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 30;
+}
+
+.tt-rail-button[data-tooltip]:hover::after,
+.tt-rail-button[data-tooltip]:focus-visible::after {
+  opacity: 1;
 }
 
 .tt-hamburger {
@@ -103,6 +145,12 @@ body {
   gap: 10px;
   overflow-y: auto;
   max-height: calc(100vh - 24px);
+  min-height: 0;
+  min-width: 0;
+}
+
+.tt-root.tt-left-collapsed .tt-left {
+  display: none;
 }
 
 .tt-main {
@@ -111,6 +159,8 @@ body {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .tt-right {
@@ -124,6 +174,8 @@ body {
   padding: 10px;
   overflow: hidden;
   max-height: calc(100vh - 24px);
+  min-height: 0;
+  min-width: 0;
 }
 
 .tt-main-header {
@@ -344,6 +396,10 @@ body {
 .tt-token-selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(217, 164, 65, 0.35);
+}
+
+.tt-token.tt-token-gm {
+  opacity: var(--gm-token-opacity, 0.55);
 }
 
 .tt-measure-overlay {
@@ -607,6 +663,22 @@ body {
   gap: 6px;
 }
 
+.tt-inline-controls {
+  grid-template-columns: minmax(0, 1fr) 44px 44px;
+}
+
+.tt-icon-button {
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  font-size: 1.15rem;
+  padding: 0;
+}
+
+.tt-icon-button.tt-danger {
+  background: linear-gradient(145deg, #b74e4e, #8f3333);
+}
+
 .tt-row {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -619,6 +691,13 @@ body {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.tt-slider-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .tt-row.is-disabled label,
@@ -753,6 +832,21 @@ body {
     grid-template-areas:
       "rail left main"
       "rail right right";
+  }
+
+  .tt-root.tt-left-collapsed {
+    grid-template-columns: 64px 1fr;
+    grid-template-areas:
+      "rail main"
+      "rail right";
+  }
+
+  .tt-root.tt-right-collapsed {
+    grid-template-columns: 64px 300px 1fr;
+  }
+
+  .tt-root.tt-left-collapsed.tt-right-collapsed {
+    grid-template-columns: 64px 1fr;
   }
 
   .tt-right {

@@ -3,9 +3,12 @@
 
   const STORAGE_SESSION_KEY = "gairos_tabletop_session";
   const STORAGE_LOG_MIN_KEY = "gairos_tabletop_log_minimized";
+  const STORAGE_LEFT_MIN_KEY = "gairos_tabletop_left_minimized";
   const MAX_MAP_BACKGROUND_DATA_URL_LENGTH = 9_500_000;
 
   const elements = {
+    root: document.getElementById("tabletop-root"),
+    leftPanel: document.querySelector(".tt-left"),
     authStatus: document.getElementById("auth-status"),
     authForms: document.getElementById("auth-forms"),
     logoutButton: document.getElementById("logout-button"),
@@ -26,14 +29,6 @@
     railRolls: document.getElementById("rail-rolls"),
     railCombat: document.getElementById("rail-combat"),
     railUtilities: document.getElementById("rail-utilities"),
-    menuButtons: document.getElementById("menu-buttons"),
-    menuAccount: document.getElementById("menu-account"),
-    menuCampaigns: document.getElementById("menu-campaigns"),
-    menuCharacter: document.getElementById("menu-character"),
-    menuBattlemaps: document.getElementById("menu-battlemaps"),
-    menuRolls: document.getElementById("menu-rolls"),
-    menuCombat: document.getElementById("menu-combat"),
-    menuUtilities: document.getElementById("menu-utilities"),
 
     campaignCard: document.getElementById("campaign-card"),
     campaignList: document.getElementById("campaign-list"),
@@ -44,13 +39,13 @@
     characterCard: document.getElementById("character-card"),
     characterSelect: document.getElementById("character-select"),
     characterNewButton: document.getElementById("character-new-button"),
+    characterDeleteButton: document.getElementById("character-delete-button"),
     characterRefreshButton: document.getElementById("character-refresh-button"),
     characterTokenPreview: document.getElementById("character-token-preview"),
     characterTokenBadge: document.getElementById("character-token-badge"),
     characterTokenLabel: document.getElementById("character-token-label"),
     characterStatsSummary: document.getElementById("character-stats-summary"),
     characterStatsDetailGrid: document.getElementById("character-stats-detail-grid"),
-    characterList: document.getElementById("character-list"),
     characterForm: document.getElementById("character-form"),
     characterId: document.getElementById("character-id"),
     characterName: document.getElementById("character-name"),
@@ -74,21 +69,23 @@
     statblockColumnName: document.getElementById("statblock-column-name"),
     statblockManualText: document.getElementById("statblock-manual-text"),
     statblockTokenImage: document.getElementById("statblock-token-image"),
+    statblockTokenFile: document.getElementById("statblock-token-file"),
 
     mapCard: document.getElementById("map-card"),
     mapSelect: document.getElementById("map-select"),
-    mapLoad: document.getElementById("map-load"),
-    mapCreate: document.getElementById("map-create"),
+    mapNew: document.getElementById("map-new"),
     mapDelete: document.getElementById("map-delete"),
-    mapCreateName: document.getElementById("map-create-name"),
-    mapCreateRows: document.getElementById("map-create-rows"),
-    mapCreateCols: document.getElementById("map-create-cols"),
-    mapScenarioType: document.getElementById("map-scenario-type"),
+    mapName: document.getElementById("map-name"),
+    mapRows: document.getElementById("map-rows"),
+    mapCols: document.getElementById("map-cols"),
     mapGridFeet: document.getElementById("map-grid-feet"),
+    mapGmOpacity: document.getElementById("map-gm-opacity"),
+    mapGmOpacityValue: document.getElementById("map-gm-opacity-value"),
     mapBackgroundInput: document.getElementById("map-background-input"),
     interactionMode: document.getElementById("interaction-mode"),
     terrainBrush: document.getElementById("terrain-brush"),
     tokenLayerSelect: document.getElementById("token-layer-select"),
+    customTokenFile: document.getElementById("custom-token-file"),
     tokenRoster: document.getElementById("token-roster"),
 
     selectedTokenControls: document.getElementById("selected-token-controls"),
@@ -136,6 +133,8 @@
     toolRectangle: document.getElementById("tool-rectangle"),
     distanceMode: document.getElementById("distance-mode"),
     drawingColor: document.getElementById("drawing-color"),
+    drawingLayerRow: document.getElementById("drawing-layer-row"),
+    drawingLayerSelect: document.getElementById("drawing-layer-select"),
     measureReadout: document.getElementById("measure-readout"),
 
     injuryEntitySelect: document.getElementById("injury-entity-select"),
@@ -164,14 +163,17 @@
     selectedTokenId: null,
     selectedPlacement: null,
     selectedCharacterId: null,
-    pendingCharacterSelection: null,
+    pendingNewCharacterName: null,
     lastRollSkillKey: null,
     activeMenu: "character",
     checkedSelfModifiers: new Set(),
     checkedApprovedModifierIds: new Set(),
     approvedModifierEntries: [],
     lastStatusTimeout: null,
-    previousMenuBeforeOpen: "character",
+    leftPanelCollapsed: false,
+    pendingCustomTokenName: "",
+    characterAutoSaveTimer: null,
+    mapAutoSaveTimer: null,
     paintDrag: {
       active: false,
       paintedCells: new Set(),
@@ -186,6 +188,7 @@
       cellSize: 40,
       preview: null,
       selectedDrawingId: null,
+      layer: "tokens",
     },
     suppressCellClickUntil: 0,
     mapView: {
@@ -435,8 +438,7 @@
   }
 
   function isToolInteractionEnabled() {
-    const panel = state.activeMenu === "menu" ? state.previousMenuBeforeOpen : state.activeMenu;
-    return panel === "utilities";
+    return (state.activeMenu || "character") === "utilities";
   }
 
   function setActiveTool(toolKey) {
@@ -495,6 +497,22 @@
     return {
       x: cell.x * cellSize + cellSize / 2,
       y: cell.y * cellSize + cellSize / 2,
+    };
+  }
+
+  function cellFromClientPoint(clientX, clientY) {
+    const map = activeMap();
+    if (!map || !elements.mapGridWrap) {
+      return null;
+    }
+    const scale = clamp(Number(state.mapView.scale) || 1, 0.45, 3.5);
+    const rect = elements.mapGridWrap.getBoundingClientRect();
+    const localX = (clientX - rect.left) / scale;
+    const localY = (clientY - rect.top) / scale;
+    const cellSize = Number(state.tool.cellSize) || 40;
+    return {
+      x: clamp(Math.floor(localX / cellSize), 0, Math.max(0, map.cols - 1)),
+      y: clamp(Math.floor(localY / cellSize), 0, Math.max(0, map.rows - 1)),
     };
   }
 
@@ -628,6 +646,7 @@
     emit("map:addDrawing", {
       type: state.tool.preview.type,
       color: state.tool.preview.color || state.tool.drawingColor,
+      layer: state.tool.layer || "tokens",
       data: state.tool.preview.data || {},
     });
     clearToolPreview();
@@ -689,6 +708,9 @@
     }
     shape.style.stroke = color;
     shape.style.fill = drawing.type === "distance" ? "none" : "";
+    if (drawing.layer === "gm") {
+      shape.style.opacity = "0.62";
+    }
     if (!isPreview) {
       shape.addEventListener("click", (event) => {
         event.preventDefault();
@@ -717,9 +739,11 @@
     }
     if (elements.mapDrawingsLayer) {
       elements.mapDrawingsLayer.innerHTML = "";
-      (Array.isArray(map.drawings) ? map.drawings : []).forEach((drawing) => {
-        renderShapeInLayer(elements.mapDrawingsLayer, drawing, false);
-      });
+      (Array.isArray(map.drawings) ? map.drawings : [])
+        .filter((drawing) => isDm() || drawing.layer !== "gm")
+        .forEach((drawing) => {
+          renderShapeInLayer(elements.mapDrawingsLayer, drawing, false);
+        });
     }
 
     if (!state.tool.preview) {
@@ -878,6 +902,7 @@
   function resetCharacterForm() {
     elements.characterId.value = "";
     elements.characterName.value = "";
+    elements.characterName.readOnly = true;
     elements.characterSheetUrl.value = "";
     elements.characterFeatsText.value = "";
     elements.characterTokenImage.value = "";
@@ -889,6 +914,135 @@
     elements.characterStrengthMod.value = "";
     elements.characterIsdc.value = "";
     renderCharacterPanels(null);
+  }
+
+  function selectedCharacterForEditing() {
+    const list = isDm() ? characters() : ownCharacters();
+    const selectedId = elements.characterId.value || state.selectedCharacterId || "";
+    if (!selectedId) {
+      return null;
+    }
+    return list.find((entry) => entry.id === selectedId) || null;
+  }
+
+  function characterSavePayload() {
+    const characterId = elements.characterId.value || state.selectedCharacterId || undefined;
+    return {
+      id: characterId || undefined,
+      name: elements.characterName.value,
+      sheetUrl: elements.characterSheetUrl.value,
+      featsText: elements.characterFeatsText.value,
+      tokenImage: elements.characterTokenImage.value,
+      speedOverride: elements.characterSpeed.value,
+      maxHpOverride: elements.characterMaxHp.value,
+      strengthModifier: elements.characterStrengthMod.value,
+      italicizedSkillDc: elements.characterIsdc.value,
+    };
+  }
+
+  function saveCharacterNow() {
+    if (!isAuthenticated()) {
+      return;
+    }
+    const selected = selectedCharacterForEditing();
+    const payload = characterSavePayload();
+    if (!payload.id || !selected) {
+      return;
+    }
+    const wantedName = String(payload.name || "").trim();
+    if (!wantedName) {
+      elements.characterName.value = selected.name || "";
+      setStatus("Character name cannot be empty.", true);
+      return;
+    }
+    if (hasNameCollision(characters(), wantedName, selected.id)) {
+      elements.characterName.value = selected.name || "";
+      setStatus("Character name already exists in this campaign.", true);
+      return;
+    }
+    payload.name = wantedName;
+    emit("character:save", payload);
+  }
+
+  function scheduleCharacterAutosave() {
+    if (state.characterAutoSaveTimer) {
+      clearTimeout(state.characterAutoSaveTimer);
+      state.characterAutoSaveTimer = null;
+    }
+    state.characterAutoSaveTimer = setTimeout(() => {
+      state.characterAutoSaveTimer = null;
+      saveCharacterNow();
+    }, 420);
+  }
+
+  function updateMapOpacityLabel() {
+    if (!elements.mapGmOpacity || !elements.mapGmOpacityValue) {
+      return;
+    }
+    const opacity = clamp(Number(elements.mapGmOpacity.value) || 0.55, 0.1, 1);
+    elements.mapGmOpacityValue.textContent = `${Math.round(opacity * 100)}%`;
+  }
+
+  function saveMapNow({ includeName = false } = {}) {
+    if (!isDm()) {
+      return;
+    }
+    const map = activeMap();
+    if (!map) {
+      return;
+    }
+    const rows = clamp(Number.parseInt(elements.mapRows && elements.mapRows.value, 10) || map.rows || 20, 5, 80);
+    const cols = clamp(Number.parseInt(elements.mapCols && elements.mapCols.value, 10) || map.cols || 30, 5, 80);
+    const feetPerCell = clamp(Number.parseFloat(elements.mapGridFeet && elements.mapGridFeet.value) || feetPerSquare(map), 1, 200);
+    const gmTokenOpacity = clamp(Number.parseFloat(elements.mapGmOpacity && elements.mapGmOpacity.value) || 0.55, 0.1, 1);
+    if (elements.mapRows) {
+      elements.mapRows.value = String(rows);
+    }
+    if (elements.mapCols) {
+      elements.mapCols.value = String(cols);
+    }
+    if (elements.mapGridFeet) {
+      elements.mapGridFeet.value = String(feetPerCell);
+    }
+    if (elements.mapGmOpacity) {
+      elements.mapGmOpacity.value = String(gmTokenOpacity);
+    }
+    updateMapOpacityLabel();
+
+    const payload = {
+      id: map.id,
+      rows,
+      cols,
+      feetPerCell,
+      gmTokenOpacity,
+    };
+
+    if (includeName && elements.mapName) {
+      const wantedName = String(elements.mapName.value || "").trim();
+      if (!wantedName) {
+        elements.mapName.value = map.name || "";
+        setStatus("Map name cannot be empty.", true);
+        return;
+      }
+      if (hasNameCollision((state.snapshot && state.snapshot.maps) || [], wantedName, map.id)) {
+        elements.mapName.value = map.name || "";
+        setStatus("Map name already exists in this campaign.", true);
+        return;
+      }
+      payload.name = wantedName;
+    }
+    emit("map:update", payload);
+  }
+
+  function scheduleMapAutosave() {
+    if (state.mapAutoSaveTimer) {
+      clearTimeout(state.mapAutoSaveTimer);
+      state.mapAutoSaveTimer = null;
+    }
+    state.mapAutoSaveTimer = setTimeout(() => {
+      state.mapAutoSaveTimer = null;
+      saveMapNow({ includeName: false });
+    }, 380);
   }
 
   function normalizeLabel(text) {
@@ -1033,6 +1187,7 @@
     }
     elements.characterId.value = character.id || "";
     elements.characterName.value = character.name || "";
+    elements.characterName.readOnly = true;
     elements.characterSheetUrl.value = character.sheetUrl || "";
     elements.characterTokenImage.value = character.tokenImage || "";
     if (elements.characterTokenFile) {
@@ -1088,6 +1243,75 @@
     elements.statblockColumnName.value = "";
     elements.statblockManualText.value = "";
     elements.statblockTokenImage.value = "";
+    if (elements.statblockTokenFile) {
+      elements.statblockTokenFile.value = "";
+    }
+  }
+
+  function normalizedEntityName(name) {
+    return String(name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+  }
+
+  function hasNameCollision(entries, wantedName, ignoreId = null) {
+    const wanted = normalizedEntityName(wantedName);
+    if (!wanted) {
+      return false;
+    }
+    return (Array.isArray(entries) ? entries : []).some((entry) => {
+      if (!entry || (ignoreId && entry.id === ignoreId)) {
+        return false;
+      }
+      return normalizedEntityName(entry.name) === wanted;
+    });
+  }
+
+  function nextUniqueName(entries, prefix) {
+    let index = 1;
+    while (index < 5000) {
+      const wanted = `${prefix} ${index}`;
+      if (!hasNameCollision(entries, wanted)) {
+        return wanted;
+      }
+      index += 1;
+    }
+    return `${prefix} ${Date.now()}`;
+  }
+
+  function updateRootLayoutClasses() {
+    if (!elements.root) {
+      return;
+    }
+    elements.root.classList.toggle("tt-left-collapsed", state.leftPanelCollapsed);
+    const rightCollapsed = Boolean(elements.logPanel && elements.logPanel.classList.contains("minimized"));
+    elements.root.classList.toggle("tt-right-collapsed", rightCollapsed);
+  }
+
+  function setLeftPanelCollapsed(collapsed, persist = true) {
+    state.leftPanelCollapsed = Boolean(collapsed);
+    if (state.leftPanelCollapsed && state.activeMenu === "battlemaps") {
+      resetMapInteractionMode();
+    }
+    if (persist) {
+      localStorage.setItem(STORAGE_LEFT_MIN_KEY, state.leftPanelCollapsed ? "1" : "0");
+    }
+    if (elements.menuToggle) {
+      elements.menuToggle.classList.toggle("active", state.leftPanelCollapsed);
+    }
+    updateRootLayoutClasses();
+  }
+
+  function resetMapInteractionMode() {
+    if (!elements.interactionMode) {
+      return;
+    }
+    elements.interactionMode.value = "move";
+    stopPaintDrag();
+    state.selectedPlacement = null;
+    updateInteractionModeUi();
+    renderTokenRoster();
   }
 
   function renderAuth() {
@@ -1100,33 +1324,14 @@
         : `${current.username} | No campaign`;
       elements.authForms.classList.add("tt-hidden");
       elements.logoutButton.classList.remove("tt-hidden");
-      if (state.activeMenu === "account") {
-        state.activeMenu = "campaigns";
-        state.previousMenuBeforeOpen = "campaigns";
-      } else if (state.previousMenuBeforeOpen === "account") {
-        state.previousMenuBeforeOpen = "campaigns";
-      }
     } else {
       elements.authStatus.textContent = "Not logged in";
       elements.authForms.classList.remove("tt-hidden");
       elements.logoutButton.classList.add("tt-hidden");
-      if (state.activeMenu !== "menu") {
+      if (state.activeMenu !== "account") {
         state.activeMenu = "account";
       }
-      state.previousMenuBeforeOpen = "account";
     }
-  }
-
-  function menuButtonsList() {
-    return [
-      elements.menuAccount,
-      elements.menuCampaigns,
-      elements.menuCharacter,
-      elements.menuBattlemaps,
-      elements.menuRolls,
-      elements.menuCombat,
-      elements.menuUtilities,
-    ].filter(Boolean);
   }
 
   function railButtonsByPanel() {
@@ -1139,11 +1344,6 @@
       { panel: "combat", button: elements.railCombat },
       { panel: "utilities", button: elements.railUtilities },
     ];
-  }
-
-  function activePanelForSidebar() {
-    const panel = state.activeMenu || "character";
-    return panel === "menu" ? state.previousMenuBeforeOpen || "character" : panel;
   }
 
   function showLogPanel(expand = true) {
@@ -1159,50 +1359,31 @@
       elements.logToggle.textContent = "Open";
       localStorage.setItem(STORAGE_LOG_MIN_KEY, "1");
     }
-  }
-
-  function openMenuScreen() {
-    const panel = state.activeMenu || "character";
-    if (panel !== "menu") {
-      state.previousMenuBeforeOpen = panel;
-      state.activeMenu = "menu";
-    }
-    applyMenuVisibility();
-  }
-
-  function closeMenuScreen() {
-    if (state.activeMenu !== "menu") {
-      return;
-    }
-    state.activeMenu = state.previousMenuBeforeOpen || "character";
-    applyMenuVisibility();
-  }
-
-  function choosePanelFromMenu(panelKey) {
-    state.activeMenu = panelKey;
-    applyMenuVisibility();
+    updateRootLayoutClasses();
   }
 
   function setActiveMenu(menuKey) {
-    if (menuKey !== "menu") {
-      state.previousMenuBeforeOpen = menuKey;
-    }
+    const previousPanel = state.activeMenu;
     state.activeMenu = menuKey;
+    if (previousPanel === "battlemaps" && menuKey !== "battlemaps") {
+      resetMapInteractionMode();
+    }
     applyMenuVisibility();
   }
 
   function applyMenuVisibility() {
     let panel = state.activeMenu || "character";
     if (panel === "battlemaps" && !isDm()) {
+      resetMapInteractionMode();
       panel = "character";
       state.activeMenu = panel;
     }
-    if (!isAuthenticated() && panel !== "account" && panel !== "menu") {
+    if (!isAuthenticated() && panel !== "account") {
+      if (panel === "battlemaps") {
+        resetMapInteractionMode();
+      }
       panel = "account";
       state.activeMenu = panel;
-    }
-    if (panel === "menu" && !isAuthenticated()) {
-      state.previousMenuBeforeOpen = "account";
     }
     const panelElements = document.querySelectorAll("[data-menu-panel]");
     panelElements.forEach((node) => {
@@ -1214,20 +1395,6 @@
       node.classList.toggle("tt-menu-hidden", !shouldShow);
     });
 
-    if (elements.menuButtons) {
-      const menuButtonActivePanel = panel === "menu" ? activePanelForSidebar() : panel;
-      menuButtonsList().forEach((button) => {
-        if (!button) {
-          return;
-        }
-        const buttonPanel = button.id.replace("menu-", "");
-        if (button === elements.menuBattlemaps) {
-          button.classList.toggle("tt-hidden", !isDm());
-        }
-        button.classList.toggle("active", buttonPanel === menuButtonActivePanel);
-      });
-    }
-
     railButtonsByPanel().forEach((entry) => {
       if (!entry.button) {
         return;
@@ -1235,12 +1402,9 @@
       if (entry.panel === "battlemaps") {
         entry.button.classList.toggle("tt-hidden", !isDm());
       }
-      const activePanel = activePanelForSidebar();
-      entry.button.classList.toggle("active", activePanel === entry.panel);
+      entry.button.classList.toggle("active", panel === entry.panel);
     });
-    if (elements.menuToggle) {
-      elements.menuToggle.classList.toggle("active", panel === "menu");
-    }
+    updateRootLayoutClasses();
   }
 
   function renderCampaigns() {
@@ -1264,6 +1428,24 @@
       left.textContent = campaign.isDm ? `${campaign.name} (DM)` : campaign.name;
       row.appendChild(left);
 
+      const controls = document.createElement("div");
+      controls.className = "tt-grid2";
+      controls.style.minWidth = campaign.isDm ? "114px" : "70px";
+
+      if (campaign.isDm) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "\u{1F5D1}";
+        remove.title = "Delete Campaign";
+        remove.addEventListener("click", () => {
+          if (!window.confirm(`Delete campaign ${campaign.name}?`)) {
+            return;
+          }
+          emit("campaign:delete", { campaignId: campaign.id });
+        });
+        controls.appendChild(remove);
+      }
+
       const open = document.createElement("button");
       open.type = "button";
       open.textContent = campaign.id === activeId ? "Open" : "Join";
@@ -1271,7 +1453,8 @@
       open.addEventListener("click", () => {
         emit("campaign:join", { campaignId: campaign.id });
       });
-      row.appendChild(open);
+      controls.appendChild(open);
+      row.appendChild(controls);
 
       elements.campaignList.appendChild(row);
     });
@@ -1281,68 +1464,15 @@
     const canSeeAll = isDm();
     const list = canSeeAll ? characters() : ownCharacters();
 
-    elements.characterList.innerHTML = "";
-    list.forEach((character) => {
-      const item = document.createElement("div");
-      item.className = "tt-list-item";
-
-      const left = document.createElement("div");
-      left.textContent = character.name;
-      item.appendChild(left);
-
-      const controls = document.createElement("div");
-      controls.className = "tt-grid2";
-
-      const editButton = document.createElement("button");
-      editButton.type = "button";
-      editButton.textContent = "Edit";
-      editButton.addEventListener("click", () => {
-        fillCharacterForm(character);
-      });
-      controls.appendChild(editButton);
-
-      const deleteButton = document.createElement("button");
-      deleteButton.type = "button";
-      deleteButton.textContent = "Delete";
-      deleteButton.addEventListener("click", () => {
-        if (!window.confirm(`Delete ${character.name}?`)) {
-          return;
-        }
-        if (state.selectedCharacterId === character.id) {
-          state.selectedCharacterId = null;
-        }
-        emit("character:delete", { id: character.id });
-      });
-      controls.appendChild(deleteButton);
-
-      item.appendChild(controls);
-
-      if (character.sheetError) {
-        const errorEl = document.createElement("div");
-        errorEl.textContent = `Sheet parse warning: ${character.sheetError}`;
-        errorEl.style.color = "#ff9a9a";
-        errorEl.style.fontSize = "0.7rem";
-        item.appendChild(errorEl);
-      }
-
-      elements.characterList.appendChild(item);
-    });
-
     elements.characterCard.classList.toggle("tt-hidden", !isAuthenticated());
     if (!elements.characterSelect) {
       return;
     }
 
     const previousSelectedId = state.selectedCharacterId;
-    const pending = state.pendingCharacterSelection;
     let selectedId = "";
-    let shouldPopulateSelection = false;
 
     elements.characterSelect.innerHTML = "";
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "New character";
-    elements.characterSelect.appendChild(placeholder);
 
     list.forEach((character) => {
       const option = document.createElement("option");
@@ -1351,64 +1481,50 @@
       elements.characterSelect.appendChild(option);
     });
 
-    if (pending) {
-      let matched = null;
-      if (pending.id) {
-        matched = list.find((character) => character.id === pending.id) || null;
-      }
-      if (!matched && pending.name) {
-        const byName = list
-          .filter(
-            (character) =>
-              normalizeLabel(character.name) === pending.name &&
-              (!pending.ownerUserId || character.ownerUserId === pending.ownerUserId)
-          )
-          .sort(
-            (a, b) =>
-              new Date(b.updatedAt || 0).getTime() -
-              new Date(a.updatedAt || 0).getTime()
-          );
-        matched = byName[0] || null;
-      }
-      if (matched) {
-        selectedId = matched.id;
-        shouldPopulateSelection = true;
-        state.pendingCharacterSelection = null;
-      } else if (Date.now() - Number(pending.submittedAt || 0) > 20_000) {
-        state.pendingCharacterSelection = null;
+    if (state.pendingNewCharacterName) {
+      const pendingMatches = list
+        .filter((character) => normalizedEntityName(character.name) === state.pendingNewCharacterName)
+        .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+      if (pendingMatches.length > 0) {
+        selectedId = pendingMatches[0].id;
+        state.pendingNewCharacterName = null;
       }
     }
 
     if (!selectedId && previousSelectedId && list.some((character) => character.id === previousSelectedId)) {
       selectedId = previousSelectedId;
-    }
-
-    if (
+    } else if (
       !selectedId &&
       elements.characterId.value &&
       list.some((character) => character.id === elements.characterId.value)
     ) {
       selectedId = elements.characterId.value;
-    }
-
-    if (
-      !selectedId &&
-      list.length === 1 &&
-      !elements.characterId.value &&
-      !elements.characterName.value.trim()
-    ) {
+    } else if (!selectedId && list.length > 0) {
       selectedId = list[0].id;
-      shouldPopulateSelection = true;
     }
 
-    elements.characterSelect.value = selectedId || "";
+    if (selectedId) {
+      elements.characterSelect.value = selectedId;
+    }
     state.selectedCharacterId = selectedId || null;
     const selectedCharacter = list.find((character) => character.id === selectedId) || null;
-
-    if (shouldPopulateSelection && selectedId) {
-      fillCharacterForm(selectedCharacter);
+    if (selectedCharacter) {
+      const focused = document.activeElement;
+      const editingCurrent =
+        focused instanceof HTMLElement &&
+        elements.characterForm &&
+        elements.characterForm.contains(focused) &&
+        elements.characterId.value === selectedCharacter.id;
+      if (editingCurrent) {
+        renderCharacterPanels(selectedCharacter);
+      } else {
+        fillCharacterForm(selectedCharacter);
+      }
     } else {
-      renderCharacterPanels(selectedCharacter);
+      resetCharacterForm();
+    }
+    if (elements.characterDeleteButton) {
+      elements.characterDeleteButton.disabled = !selectedCharacter;
     }
   }
 
@@ -1442,6 +1558,9 @@
         elements.statblockColumnName.value = statblock.columnName || "";
         elements.statblockManualText.value = statblock.manualText || "";
         elements.statblockTokenImage.value = statblock.tokenImage || "";
+        if (elements.statblockTokenFile) {
+          elements.statblockTokenFile.value = "";
+        }
       });
       controls.appendChild(editButton);
 
@@ -1473,6 +1592,9 @@
   function renderMaps() {
     const show = isDm();
     elements.mapCard.classList.toggle("tt-hidden", !show);
+    if (elements.drawingLayerRow) {
+      elements.drawingLayerRow.classList.toggle("tt-hidden", !show);
+    }
     if (!show) {
       updateInteractionModeUi();
       return;
@@ -1490,15 +1612,53 @@
       elements.mapSelect.appendChild(option);
     });
 
-    if (maps.some((map) => map.id === previousValue)) {
-      elements.mapSelect.value = previousValue;
-    } else if (activeMapId) {
+    if (activeMapId && maps.some((map) => map.id === activeMapId)) {
       elements.mapSelect.value = activeMapId;
+    } else if (maps.some((map) => map.id === previousValue)) {
+      elements.mapSelect.value = previousValue;
     }
 
     const map = activeMap();
-    if (elements.mapGridFeet && map) {
-      elements.mapGridFeet.value = String(feetPerSquare(map));
+    if (map) {
+      if (elements.mapName && document.activeElement !== elements.mapName) {
+        elements.mapName.value = map.name || "";
+        elements.mapName.readOnly = true;
+      }
+      if (elements.mapRows && document.activeElement !== elements.mapRows) {
+        elements.mapRows.value = String(map.rows || 20);
+      }
+      if (elements.mapCols && document.activeElement !== elements.mapCols) {
+        elements.mapCols.value = String(map.cols || 30);
+      }
+      if (elements.mapGridFeet && document.activeElement !== elements.mapGridFeet) {
+        elements.mapGridFeet.value = String(feetPerSquare(map));
+      }
+      if (elements.mapGmOpacity && document.activeElement !== elements.mapGmOpacity) {
+        const opacity = clamp(Number(map.gmTokenOpacity) || 0.55, 0.1, 1);
+        elements.mapGmOpacity.value = String(opacity);
+      }
+      if (elements.mapGmOpacityValue && elements.mapGmOpacity) {
+        elements.mapGmOpacityValue.textContent = `${Math.round((Number(elements.mapGmOpacity.value) || 0.55) * 100)}%`;
+      }
+    } else {
+      if (elements.mapName) {
+        elements.mapName.value = "";
+      }
+      if (elements.mapRows) {
+        elements.mapRows.value = "";
+      }
+      if (elements.mapCols) {
+        elements.mapCols.value = "";
+      }
+      if (elements.mapGridFeet) {
+        elements.mapGridFeet.value = "";
+      }
+      if (elements.mapGmOpacityValue) {
+        elements.mapGmOpacityValue.textContent = "";
+      }
+    }
+    if (elements.mapDelete) {
+      elements.mapDelete.disabled = !map;
     }
 
     renderTokenRoster();
@@ -1601,6 +1761,16 @@
       const row = elements.terrainBrush.closest(".tt-row");
       if (row) {
         row.classList.toggle("is-disabled", placeMode);
+      }
+    }
+    if (elements.drawingLayerRow) {
+      elements.drawingLayerRow.classList.toggle("tt-hidden", !isDm());
+    }
+    if (elements.drawingLayerSelect) {
+      elements.drawingLayerSelect.disabled = !isDm();
+      if (!isDm()) {
+        elements.drawingLayerSelect.value = "tokens";
+        state.tool.layer = "tokens";
       }
     }
   }
@@ -1803,6 +1973,13 @@
 
       const tokenEl = document.createElement("div");
       tokenEl.className = "tt-token";
+      if (token.layer === "gm") {
+        tokenEl.classList.add("tt-token-gm");
+        tokenEl.style.setProperty(
+          "--gm-token-opacity",
+          String(clamp(Number(map.gmTokenOpacity) || 0.55, 0.1, 1))
+        );
+      }
       if (token.id === state.selectedTokenId) {
         tokenEl.classList.add("tt-token-selected");
       }
@@ -1984,45 +2161,21 @@
     customButton.type = "button";
     customButton.textContent = "Use";
     customButton.addEventListener("click", () => {
-      const name = window.prompt("Custom token name:", "Custom");
+      const name = window.prompt("Custom token name:", state.pendingCustomTokenName || "Custom");
       if (!name) {
         return;
       }
-      const tokenImage = window.prompt("Token image URL or data URI (optional):", "") || "";
-      const placement = {
-        sourceType: "custom",
-        sourceId: "",
-        name,
-        tokenImage,
-      };
-      state.selectedPlacement = placement;
-      elements.interactionMode.value = "place";
-      updateInteractionModeUi();
-      setStatus(`Selected custom token ${name}.`);
-      renderTokenRoster();
+      if (!elements.customTokenFile) {
+        setStatus("Custom token file upload is unavailable.", true);
+        return;
+      }
+      state.pendingCustomTokenName = name.trim() || "Custom";
+      setStatus("Upload a token image file for the custom token.");
+      elements.customTokenFile.value = "";
+      elements.customTokenFile.click();
     });
     customItem.appendChild(customButton);
-    customItem.draggable = true;
-    customItem.title = "Drag onto the map to place a custom token.";
-    customItem.addEventListener("dragstart", (event) => {
-      const name = window.prompt("Custom token name:", "Custom");
-      if (!name) {
-        event.preventDefault();
-        return;
-      }
-      const tokenImage = window.prompt("Token image URL or data URI (optional):", "") || "";
-      const payload = JSON.stringify({
-        sourceType: "custom",
-        sourceId: "",
-        name,
-        tokenImage,
-      });
-      if (event.dataTransfer) {
-        event.dataTransfer.setData("application/x-tabletop-placement", payload);
-        event.dataTransfer.setData("text/plain", payload);
-        event.dataTransfer.effectAllowed = "copy";
-      }
-    });
+    customItem.title = "Use token file upload to choose a custom token image.";
     elements.tokenRoster.appendChild(customItem);
   }
 
@@ -2725,6 +2878,9 @@
     if (elements.drawingColor) {
       elements.drawingColor.value = state.tool.drawingColor;
     }
+    if (elements.drawingLayerSelect) {
+      elements.drawingLayerSelect.value = state.tool.layer || "tokens";
+    }
   }
 
   function parseEntitySelectionForPayload(selectValue) {
@@ -2803,56 +2959,51 @@
 
   if (elements.menuToggle) {
     elements.menuToggle.addEventListener("click", () => {
-      if (state.activeMenu === "menu") {
-        closeMenuScreen();
-      } else {
-        openMenuScreen();
-      }
+      setLeftPanelCollapsed(!state.leftPanelCollapsed);
     });
   }
 
-  if (elements.menuAccount) {
-    elements.menuAccount.addEventListener("click", () => choosePanelFromMenu("account"));
-  }
-  if (elements.menuCampaigns) {
-    elements.menuCampaigns.addEventListener("click", () => choosePanelFromMenu("campaigns"));
-  }
-  if (elements.menuCharacter) {
-    elements.menuCharacter.addEventListener("click", () => choosePanelFromMenu("character"));
-  }
-  if (elements.menuBattlemaps) {
-    elements.menuBattlemaps.addEventListener("click", () => choosePanelFromMenu("battlemaps"));
-  }
-  if (elements.menuRolls) {
-    elements.menuRolls.addEventListener("click", () => choosePanelFromMenu("rolls"));
-  }
-  if (elements.menuCombat) {
-    elements.menuCombat.addEventListener("click", () => choosePanelFromMenu("combat"));
-  }
-  if (elements.menuUtilities) {
-    elements.menuUtilities.addEventListener("click", () => choosePanelFromMenu("utilities"));
-  }
-
   if (elements.railAccount) {
-    elements.railAccount.addEventListener("click", () => setActiveMenu("account"));
+    elements.railAccount.addEventListener("click", () => {
+      setActiveMenu("account");
+      setLeftPanelCollapsed(false);
+    });
   }
   if (elements.railCampaigns) {
-    elements.railCampaigns.addEventListener("click", () => setActiveMenu("campaigns"));
+    elements.railCampaigns.addEventListener("click", () => {
+      setActiveMenu("campaigns");
+      setLeftPanelCollapsed(false);
+    });
   }
   if (elements.railCharacter) {
-    elements.railCharacter.addEventListener("click", () => setActiveMenu("character"));
+    elements.railCharacter.addEventListener("click", () => {
+      setActiveMenu("character");
+      setLeftPanelCollapsed(false);
+    });
   }
   if (elements.railBattlemaps) {
-    elements.railBattlemaps.addEventListener("click", () => setActiveMenu("battlemaps"));
+    elements.railBattlemaps.addEventListener("click", () => {
+      setActiveMenu("battlemaps");
+      setLeftPanelCollapsed(false);
+    });
   }
   if (elements.railRolls) {
-    elements.railRolls.addEventListener("click", () => setActiveMenu("rolls"));
+    elements.railRolls.addEventListener("click", () => {
+      setActiveMenu("rolls");
+      setLeftPanelCollapsed(false);
+    });
   }
   if (elements.railCombat) {
-    elements.railCombat.addEventListener("click", () => setActiveMenu("combat"));
+    elements.railCombat.addEventListener("click", () => {
+      setActiveMenu("combat");
+      setLeftPanelCollapsed(false);
+    });
   }
   if (elements.railUtilities) {
-    elements.railUtilities.addEventListener("click", () => setActiveMenu("utilities"));
+    elements.railUtilities.addEventListener("click", () => {
+      setActiveMenu("utilities");
+      setLeftPanelCollapsed(false);
+    });
   }
 
   if (elements.campaignForm) {
@@ -2883,12 +3034,60 @@
 
   if (elements.characterNewButton) {
     elements.characterNewButton.addEventListener("click", () => {
-      state.selectedCharacterId = null;
-      state.pendingCharacterSelection = null;
-      if (elements.characterSelect) {
-        elements.characterSelect.value = "";
+      const pool = characters();
+      const name = nextUniqueName(pool, "New Character");
+      state.pendingNewCharacterName = normalizedEntityName(name);
+      emit("character:save", {
+        name,
+        sheetUrl: "",
+        featsText: "",
+        tokenImage: "",
+      });
+      setStatus(`Creating ${name}...`);
+    });
+  }
+
+  if (elements.characterDeleteButton) {
+    elements.characterDeleteButton.addEventListener("click", () => {
+      const selected = selectedCharacterForEditing();
+      if (!selected) {
+        setStatus("Select a character first.", true);
+        return;
       }
-      resetCharacterForm();
+      if (!window.confirm(`Delete ${selected.name}?`)) {
+        return;
+      }
+      emit("character:delete", { id: selected.id });
+    });
+  }
+
+  if (elements.characterName) {
+    elements.characterName.addEventListener("dblclick", () => {
+      const selected = selectedCharacterForEditing();
+      if (!selected) {
+        return;
+      }
+      elements.characterName.readOnly = false;
+      elements.characterName.dataset.previousValue = elements.characterName.value || "";
+      elements.characterName.focus();
+      elements.characterName.select();
+    });
+    elements.characterName.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        elements.characterName.blur();
+      } else if (event.key === "Escape") {
+        elements.characterName.value = elements.characterName.dataset.previousValue || "";
+        elements.characterName.readOnly = true;
+        elements.characterName.blur();
+      }
+    });
+    elements.characterName.addEventListener("blur", () => {
+      if (elements.characterName.readOnly) {
+        return;
+      }
+      elements.characterName.readOnly = true;
+      saveCharacterNow();
     });
   }
 
@@ -2904,6 +3103,23 @@
     });
   }
 
+  if (elements.characterSheetUrl) {
+    elements.characterSheetUrl.addEventListener("change", () => {
+      scheduleCharacterAutosave();
+    });
+    elements.characterSheetUrl.addEventListener("blur", () => {
+      scheduleCharacterAutosave();
+    });
+  }
+  if (elements.characterFeatsText) {
+    elements.characterFeatsText.addEventListener("input", () => {
+      scheduleCharacterAutosave();
+    });
+    elements.characterFeatsText.addEventListener("blur", () => {
+      scheduleCharacterAutosave();
+    });
+  }
+
   if (elements.characterTokenFile) {
     elements.characterTokenFile.addEventListener("change", async () => {
       const file = elements.characterTokenFile.files && elements.characterTokenFile.files[0];
@@ -2913,6 +3129,7 @@
       try {
         const imageDataUrl = await readFileAsDataUrl(file);
         elements.characterTokenImage.value = imageDataUrl;
+        scheduleCharacterAutosave();
         setStatus(`Loaded token file: ${file.name}`);
       } catch (error) {
         setStatus(error.message, true);
@@ -2922,25 +3139,24 @@
 
   elements.characterForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    state.pendingCharacterSelection = {
-      id: elements.characterId.value || null,
-      name: normalizeLabel(elements.characterName.value),
-      ownerUserId: userId(),
-      submittedAt: Date.now(),
-    };
-    state.selectedCharacterId = elements.characterId.value || state.selectedCharacterId || null;
-    emit("character:save", {
-      id: elements.characterId.value || undefined,
-      name: elements.characterName.value,
-      sheetUrl: elements.characterSheetUrl.value,
-      featsText: elements.characterFeatsText.value,
-      tokenImage: elements.characterTokenImage.value,
-      speedOverride: elements.characterSpeed.value,
-      maxHpOverride: elements.characterMaxHp.value,
-      strengthModifier: elements.characterStrengthMod.value,
-      italicizedSkillDc: elements.characterIsdc.value,
-    });
+    saveCharacterNow();
   });
+
+  if (elements.statblockTokenFile) {
+    elements.statblockTokenFile.addEventListener("change", async () => {
+      const file = elements.statblockTokenFile.files && elements.statblockTokenFile.files[0];
+      if (!file) {
+        return;
+      }
+      try {
+        const imageDataUrl = await readFileAsDataUrl(file);
+        elements.statblockTokenImage.value = imageDataUrl;
+        setStatus(`Loaded token file: ${file.name}`);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    });
+  }
 
   elements.statblockForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -2957,23 +3173,35 @@
     resetStatblockForm();
   });
 
-  elements.mapCreate.addEventListener("click", () => {
-    emit("map:create", {
-      name: elements.mapCreateName.value || "New Battlemap",
-      rows: elements.mapCreateRows.value,
-      cols: elements.mapCreateCols.value,
-      scenarioType: elements.mapScenarioType.value,
-      feetPerCell: Number.parseFloat(elements.mapGridFeet.value) || 5,
+  if (elements.mapNew) {
+    elements.mapNew.addEventListener("click", () => {
+      const maps = (state.snapshot && state.snapshot.maps) || [];
+      const current = activeMap();
+      const name = nextUniqueName(maps, "New Map");
+      emit("map:create", {
+        name,
+        rows: current ? current.rows : 20,
+        cols: current ? current.cols : 30,
+        feetPerCell: current ? feetPerSquare(current) : 5,
+      });
+      setStatus(`Creating ${name}...`);
     });
-  });
+  }
 
-  elements.mapLoad.addEventListener("click", () => {
-    emit("map:load", { id: elements.mapSelect.value });
-  });
+  if (elements.mapSelect) {
+    elements.mapSelect.addEventListener("change", () => {
+      if (!elements.mapSelect.value) {
+        return;
+      }
+      emit("map:load", { id: elements.mapSelect.value });
+    });
+  }
 
   elements.mapDelete.addEventListener("click", () => {
     const mapId = elements.mapSelect.value;
-    const selected = state.snapshot.maps.find((entry) => entry.id === mapId);
+    const selected = state.snapshot && state.snapshot.maps
+      ? state.snapshot.maps.find((entry) => entry.id === mapId)
+      : null;
     if (!selected) {
       return;
     }
@@ -2982,6 +3210,36 @@
     }
     emit("map:delete", { id: mapId });
   });
+
+  if (elements.mapName) {
+    elements.mapName.addEventListener("dblclick", () => {
+      const map = activeMap();
+      if (!map) {
+        return;
+      }
+      elements.mapName.readOnly = false;
+      elements.mapName.dataset.previousValue = elements.mapName.value || "";
+      elements.mapName.focus();
+      elements.mapName.select();
+    });
+    elements.mapName.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        elements.mapName.blur();
+      } else if (event.key === "Escape") {
+        elements.mapName.value = elements.mapName.dataset.previousValue || "";
+        elements.mapName.readOnly = true;
+        elements.mapName.blur();
+      }
+    });
+    elements.mapName.addEventListener("blur", () => {
+      if (elements.mapName.readOnly) {
+        return;
+      }
+      elements.mapName.readOnly = true;
+      saveMapNow({ includeName: true });
+    });
+  }
 
   elements.mapBackgroundInput.addEventListener("change", async () => {
     const file = elements.mapBackgroundInput.files && elements.mapBackgroundInput.files[0];
@@ -2998,16 +3256,59 @@
     elements.mapBackgroundInput.value = "";
   });
 
-  if (elements.mapGridFeet) {
-    elements.mapGridFeet.addEventListener("change", () => {
-      const map = activeMap();
-      if (!isDm() || !map) {
+  if (elements.customTokenFile) {
+    elements.customTokenFile.addEventListener("change", async () => {
+      const file = elements.customTokenFile.files && elements.customTokenFile.files[0];
+      if (!file) {
         return;
       }
-      const value = clamp(Number.parseFloat(elements.mapGridFeet.value) || 5, 1, 200);
-      elements.mapGridFeet.value = String(value);
-      emit("map:setScale", { feetPerCell: value });
+      try {
+        const tokenImage = await readFileAsDataUrl(file);
+        const fallbackName = String(file.name || "").replace(/\.[^./\\]+$/, "") || "Custom";
+        const name = (state.pendingCustomTokenName || fallbackName).trim() || "Custom";
+        state.pendingCustomTokenName = "";
+        state.selectedPlacement = {
+          sourceType: "custom",
+          sourceId: "",
+          name,
+          tokenImage,
+        };
+        elements.interactionMode.value = "place";
+        updateInteractionModeUi();
+        renderTokenRoster();
+        setStatus(`Selected custom token ${name}.`);
+      } catch (error) {
+        setStatus(error.message, true);
+      } finally {
+        elements.customTokenFile.value = "";
+      }
+    });
+  }
+
+  if (elements.mapGridFeet) {
+    elements.mapGridFeet.addEventListener("change", () => {
+      scheduleMapAutosave();
       renderMeasurementOverlay();
+    });
+  }
+  if (elements.mapRows) {
+    elements.mapRows.addEventListener("change", () => {
+      scheduleMapAutosave();
+    });
+  }
+  if (elements.mapCols) {
+    elements.mapCols.addEventListener("change", () => {
+      scheduleMapAutosave();
+    });
+  }
+  if (elements.mapGmOpacity) {
+    elements.mapGmOpacity.addEventListener("input", () => {
+      updateMapOpacityLabel();
+      scheduleMapAutosave();
+    });
+    elements.mapGmOpacity.addEventListener("change", () => {
+      updateMapOpacityLabel();
+      scheduleMapAutosave();
     });
   }
 
@@ -3200,6 +3501,13 @@
       setDrawingColor(elements.drawingColor.value);
     });
   }
+  if (elements.drawingLayerSelect) {
+    elements.drawingLayerSelect.addEventListener("change", () => {
+      const nextLayer = elements.drawingLayerSelect.value === "gm" ? "gm" : "tokens";
+      state.tool.layer = nextLayer;
+      renderMeasurementOverlay();
+    });
+  }
 
   if (elements.boardWrap) {
     elements.boardWrap.addEventListener("contextmenu", (event) => {
@@ -3233,6 +3541,14 @@
 
   window.addEventListener("mousemove", (event) => {
     continueMapPan(event);
+    if (!state.tool.dragging || !isToolInteractionEnabled()) {
+      return;
+    }
+    const cell = cellFromClientPoint(event.clientX, event.clientY);
+    if (!cell) {
+      return;
+    }
+    updateMeasureDrag(cell.x, cell.y, state.tool.cellSize);
   });
 
   window.addEventListener("mouseup", () => {
@@ -3277,10 +3593,8 @@
 
   if (elements.logToggle && elements.logPanel) {
     elements.logToggle.addEventListener("click", () => {
-      const minimized = elements.logPanel.classList.toggle("minimized");
-      elements.logToggle.textContent = minimized ? "Open" : "Minimize";
-      localStorage.setItem(STORAGE_LOG_MIN_KEY, minimized ? "1" : "0");
-      applyMenuVisibility();
+      const expand = elements.logPanel.classList.contains("minimized");
+      showLogPanel(expand);
     });
   }
 
@@ -3415,9 +3729,12 @@
   });
 
   const minimizedByDefault = localStorage.getItem(STORAGE_LOG_MIN_KEY) === "1";
-  if (minimizedByDefault && elements.logPanel && elements.logToggle) {
-    elements.logPanel.classList.add("minimized");
-    elements.logToggle.textContent = "Open";
+  showLogPanel(!minimizedByDefault);
+  const leftCollapsedByDefault = localStorage.getItem(STORAGE_LEFT_MIN_KEY) === "1";
+  setLeftPanelCollapsed(leftCollapsedByDefault, false);
+  if (elements.drawingLayerSelect) {
+    state.tool.layer = elements.drawingLayerSelect.value === "gm" ? "gm" : "tokens";
   }
+  updateMapOpacityLabel();
   applyMapViewTransform();
 })();

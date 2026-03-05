@@ -10,47 +10,47 @@
   <body data-default-role="dm">
     <div id="tabletop-root" class="tt-root">
       <aside class="tt-mode-rail">
-        <button id="menu-toggle" type="button" class="tt-rail-button tt-rail-menu" title="Menu" aria-label="Menu">
+        <button
+          id="menu-toggle"
+          type="button"
+          class="tt-rail-button tt-rail-menu"
+          title="Toggle Toolbar"
+          aria-label="Toggle Toolbar"
+          data-tooltip="Toggle Toolbar"
+        >
           <span class="tt-hamburger" aria-hidden="true"><span></span><span></span><span></span></span>
         </button>
         <div class="tt-rail-divider"></div>
-        <button id="rail-account" type="button" class="tt-rail-button" title="Account">
+        <button id="rail-account" type="button" class="tt-rail-button" title="Account" data-tooltip="Account">
           <img src="/tabletop-icons/account.svg" alt="" />
         </button>
-        <button id="rail-campaigns" type="button" class="tt-rail-button" title="Campaigns">
-          <img src="/tabletop-icons/battlemaps.svg" alt="" />
+        <button id="rail-campaigns" type="button" class="tt-rail-button" title="Campaigns" data-tooltip="Campaigns">
+          <img src="/tabletop-icons/campaigns.svg" alt="" />
         </button>
-        <button id="rail-character" type="button" class="tt-rail-button" title="Character">
+        <button id="rail-character" type="button" class="tt-rail-button" title="Character" data-tooltip="Character">
           <img src="/tabletop-icons/character.svg" alt="" />
         </button>
-        <button id="rail-battlemaps" type="button" class="tt-rail-button tt-hidden" title="Battlemaps">
+        <button
+          id="rail-battlemaps"
+          type="button"
+          class="tt-rail-button tt-hidden"
+          title="Battlemaps"
+          data-tooltip="Battlemaps"
+        >
           <img src="/tabletop-icons/battlemaps.svg" alt="" />
         </button>
-        <button id="rail-rolls" type="button" class="tt-rail-button" title="Rolls">
+        <button id="rail-rolls" type="button" class="tt-rail-button" title="Rolls" data-tooltip="Rolls">
           <img src="/tabletop-icons/rolls.svg" alt="" />
         </button>
-        <button id="rail-combat" type="button" class="tt-rail-button" title="Combat">
+        <button id="rail-combat" type="button" class="tt-rail-button" title="Combat" data-tooltip="Combat">
           <img src="/tabletop-icons/combat.svg" alt="" />
         </button>
-        <button id="rail-utilities" type="button" class="tt-rail-button" title="Utilities">
+        <button id="rail-utilities" type="button" class="tt-rail-button" title="Utilities" data-tooltip="Utilities">
           <img src="/tabletop-icons/utilities.svg" alt="" />
         </button>
       </aside>
 
       <aside class="tt-left">
-        <section class="tt-card tt-panel" id="menu-card" data-menu-panel="menu">
-          <h2>Menu</h2>
-          <div id="menu-buttons" class="tt-menu-buttons">
-            <button id="menu-account" type="button" class="tt-menu-button" title="Account"><img src="/tabletop-icons/account.svg" alt="" /><span>Account</span></button>
-            <button id="menu-campaigns" type="button" class="tt-menu-button" title="Campaigns"><img src="/tabletop-icons/battlemaps.svg" alt="" /><span>Campaigns</span></button>
-            <button id="menu-character" type="button" class="tt-menu-button" title="Character"><img src="/tabletop-icons/character.svg" alt="" /><span>Character</span></button>
-            <button id="menu-battlemaps" type="button" class="tt-menu-button tt-hidden" title="Battlemaps"><img src="/tabletop-icons/battlemaps.svg" alt="" /><span>Battlemaps</span></button>
-            <button id="menu-rolls" type="button" class="tt-menu-button" title="Skill Rolls"><img src="/tabletop-icons/rolls.svg" alt="" /><span>Rolls</span></button>
-            <button id="menu-combat" type="button" class="tt-menu-button" title="Combat"><img src="/tabletop-icons/combat.svg" alt="" /><span>Combat</span></button>
-            <button id="menu-utilities" type="button" class="tt-menu-button" title="Utilities"><img src="/tabletop-icons/utilities.svg" alt="" /><span>Utilities</span></button>
-          </div>
-        </section>
-
         <section class="tt-card tt-panel" id="auth-card" data-menu-panel="account">
           <h2>Account</h2>
           <div id="auth-status">Connecting...</div>
@@ -81,9 +81,10 @@
 
         <section class="tt-card tt-panel" id="character-card" data-menu-panel="character">
           <h2>Characters</h2>
-          <div class="tt-grid2">
+          <div class="tt-grid3 tt-inline-controls">
             <select id="character-select"></select>
-            <button id="character-new-button" type="button">New</button>
+            <button id="character-new-button" type="button" class="tt-icon-button" title="New Character">+</button>
+            <button id="character-delete-button" type="button" class="tt-icon-button tt-danger" title="Delete Character">&#128465;</button>
           </div>
           <div id="character-token-preview" class="tt-token-preview">
             <div id="character-token-badge" class="tt-token-badge">?</div>
@@ -94,27 +95,22 @@
             <summary>Expanded Stats</summary>
             <div id="character-stats-detail-grid" class="tt-stat-grid"></div>
           </details>
-          <div id="character-list" class="tt-list"></div>
           <form id="character-form" class="tt-form">
             <input id="character-id" type="hidden" />
-            <label class="tt-field" for="character-name">Character Name</label>
-            <input id="character-name" type="text" placeholder="Character name" />
+            <label class="tt-field" for="character-name">Character Name (double-click to edit)</label>
+            <input id="character-name" type="text" placeholder="Character name" readonly />
             <label class="tt-field" for="character-sheet-url">Character Sheet URL</label>
             <input id="character-sheet-url" type="url" placeholder="Character sheet URL" />
             <label class="tt-field" for="character-feats-text">Manual Feats (optional)</label>
             <textarea id="character-feats-text" placeholder="Optional feats (one per line)"></textarea>
-            <label class="tt-field" for="character-token-image">Token URL/Data URI (optional)</label>
-            <input id="character-token-image" type="text" placeholder="Token URL or data URI" />
+            <input id="character-token-image" type="hidden" />
             <label class="tt-field" for="character-token-file">Token File Upload</label>
             <input id="character-token-file" type="file" accept="image/*" />
             <input id="character-speed" type="hidden" />
             <input id="character-max-hp" type="hidden" />
             <input id="character-strength-mod" type="hidden" />
             <input id="character-isdc" type="hidden" />
-            <div class="tt-grid2">
-              <button type="submit">Save Character</button>
-              <button id="character-refresh-button" type="button">Refresh Sheet</button>
-            </div>
+            <button id="character-refresh-button" type="button">Refresh Sheet</button>
           </form>
         </section>
 
@@ -133,32 +129,42 @@
             <input id="statblock-sheet-name" type="text" placeholder="Sheet tab (default: Augmented beasts)" />
             <input id="statblock-column-name" type="text" placeholder="Column / creature name" />
             <textarea id="statblock-manual-text" placeholder="Manual rows, e.g. Strength: 4"></textarea>
-            <input id="statblock-token-image" type="text" placeholder="Token URL or data URI" />
+            <input id="statblock-token-image" type="hidden" />
+            <label class="tt-field" for="statblock-token-file">Token File Upload</label>
+            <input id="statblock-token-file" type="file" accept="image/*" />
             <button type="submit">Save Statblock</button>
           </form>
         </section>
 
         <section class="tt-card tt-hidden tt-panel" id="map-card" data-menu-panel="battlemaps">
           <h2>Battlemaps (DM)</h2>
-          <div class="tt-grid2">
+          <div class="tt-grid3 tt-inline-controls">
             <select id="map-select"></select>
-            <button id="map-load" type="button">Load</button>
+            <button id="map-new" type="button" class="tt-icon-button" title="New Map">+</button>
+            <button id="map-delete" type="button" class="tt-icon-button tt-danger" title="Delete Map">&#128465;</button>
           </div>
+          <label class="tt-field" for="map-name">Map Name (double-click to edit)</label>
+          <input id="map-name" type="text" placeholder="Map name" readonly />
           <div class="tt-grid2">
-            <button id="map-create" type="button">Create</button>
-            <button id="map-delete" type="button">Delete</button>
+            <div>
+              <label class="tt-field" for="map-rows">Rows</label>
+              <input id="map-rows" type="number" min="5" max="80" value="20" />
+            </div>
+            <div>
+              <label class="tt-field" for="map-cols">Cols</label>
+              <input id="map-cols" type="number" min="5" max="80" value="30" />
+            </div>
           </div>
-          <div class="tt-grid3">
-            <input id="map-create-name" type="text" placeholder="Map name" />
-            <input id="map-create-rows" type="number" min="5" max="80" placeholder="Rows" value="20" />
-            <input id="map-create-cols" type="number" min="5" max="80" placeholder="Cols" value="30" />
-          </div>
-          <select id="map-scenario-type">
-            <option value="standard">Standard</option>
-          </select>
           <div class="tt-row">
             <label for="map-grid-feet">Feet per Square</label>
             <input id="map-grid-feet" type="number" min="1" max="200" value="5" />
+          </div>
+          <div class="tt-row">
+            <label for="map-gm-opacity">GM Token Opacity</label>
+            <div class="tt-slider-row">
+              <input id="map-gm-opacity" type="range" min="0.1" max="1" step="0.05" value="0.55" />
+              <span id="map-gm-opacity-value">55%</span>
+            </div>
           </div>
           <label class="tt-file-label" for="map-background-input">Background Image</label>
           <input id="map-background-input" type="file" accept="image/*" />
@@ -196,6 +202,7 @@
             </select>
           </div>
 
+          <input id="custom-token-file" type="file" accept="image/*" class="tt-hidden" />
           <div id="token-roster" class="tt-list"></div>
           <div id="selected-token-controls" class="tt-hidden">
             <div class="tt-grid2">
@@ -331,6 +338,13 @@
           <div class="tt-row">
             <label for="drawing-color">Drawing Color</label>
             <input id="drawing-color" type="color" value="#f3c56e" />
+          </div>
+          <div class="tt-row" id="drawing-layer-row">
+            <label for="drawing-layer-select">Drawing Layer</label>
+            <select id="drawing-layer-select">
+              <option value="tokens">Tokens Layer</option>
+              <option value="gm">GM Layer</option>
+            </select>
           </div>
           <div id="measure-readout" class="tt-inline-value">Distance: -</div>
           <div class="tt-log-meta">Drag on the map to preview. Right-click to convert preview to drawing.</div>
