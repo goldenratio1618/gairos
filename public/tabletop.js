@@ -82,9 +82,10 @@
     mapGmOpacity: document.getElementById("map-gm-opacity"),
     mapGmOpacityValue: document.getElementById("map-gm-opacity-value"),
     mapBackgroundInput: document.getElementById("map-background-input"),
-    interactionMode: document.getElementById("interaction-mode"),
-    terrainBrush: document.getElementById("terrain-brush"),
-    tokenLayerSelect: document.getElementById("token-layer-select"),
+    modeGroup: document.getElementById("mode-group"),
+    brushGroup: document.getElementById("brush-group"),
+    brushPanel: document.getElementById("brush-panel"),
+    layerGroup: document.getElementById("layer-group"),
     customTokenFile: document.getElementById("custom-token-file"),
     tokenRoster: document.getElementById("token-roster"),
 
@@ -145,11 +146,13 @@
     boardWrap: document.getElementById("board-wrap"),
     mapGridWrap: document.getElementById("map-grid-wrap"),
     mapGridCells: document.getElementById("map-grid-cells"),
+    mapTerrainLayer: document.getElementById("map-terrain-layer"),
     mapGridTokens: document.getElementById("map-grid-tokens"),
     mapMeasureOverlay: document.getElementById("map-measure-overlay"),
     mapDrawingsLayer: document.getElementById("map-drawings-layer"),
     mapPreviewLayer: document.getElementById("map-preview-layer"),
     mapMeasureLabel: document.getElementById("map-measure-label"),
+    mapSelectBox: document.getElementById("map-select-box"),
 
     logPanel: document.getElementById("log-panel"),
     logToggle: document.getElementById("log-toggle"),
@@ -160,7 +163,7 @@
 
   const state = {
     snapshot: null,
-    selectedTokenId: null,
+    selectedTokenIds: new Set(),
     selectedPlacement: null,
     selectedCharacterId: null,
     pendingNewCharacterName: null,
@@ -174,9 +177,21 @@
     pendingCustomTokenName: "",
     characterAutoSaveTimer: null,
     mapAutoSaveTimer: null,
+    interactionMode: "move",
+    terrainBrush: "erase",
+    tokenLayer: "tokens",
     paintDrag: {
       active: false,
       paintedCells: new Set(),
+    },
+    terrainCellEls: [],
+    lastRenderedTerrain: null,
+    dragSelect: {
+      active: false,
+      startClientX: 0,
+      startClientY: 0,
+      endClientX: 0,
+      endClientY: 0,
     },
     tool: {
       active: "distance",
@@ -211,7 +226,8 @@
     const text = String(message || "");
     if (elements.mainStatus) {
       elements.mainStatus.textContent = text;
-      elements.mainStatus.style.color = isError ? "#ff8a8a" : "#9fb5ac";
+      elements.mainStatus.classList.toggle("tt-status-error", isError);
+      elements.mainStatus.classList.toggle("tt-hidden", !text);
     }
     if (state.lastStatusTimeout) {
       clearTimeout(state.lastStatusTimeout);
@@ -220,8 +236,8 @@
     if (text) {
       state.lastStatusTimeout = setTimeout(() => {
         if (elements.mainStatus) {
-          elements.mainStatus.textContent = "Ready";
-          elements.mainStatus.style.color = "#9fb5ac";
+          elements.mainStatus.textContent = "";
+          elements.mainStatus.classList.add("tt-hidden");
         }
       }, 3000);
     }
@@ -341,18 +357,55 @@
   }
 
   function activeInteractionMode() {
-    if (!isDm() || !elements.interactionMode) {
+    if (!isDm()) {
       return "move";
     }
-    return elements.interactionMode.value || "move";
+    return state.interactionMode || "move";
   }
 
   function isPaintModeActive() {
-    return isDm() && activeInteractionMode() === "paint";
+    return isDm() && state.interactionMode === "paint";
   }
 
   function isPlaceModeActive() {
-    return isDm() && activeInteractionMode() === "place";
+    return isDm() && state.interactionMode === "place";
+  }
+
+  function setInteractionMode(mode) {
+    const normalized = ["move", "paint", "place"].includes(mode) ? mode : "move";
+    state.interactionMode = normalized;
+    if (elements.modeGroup) {
+      elements.modeGroup.querySelectorAll(".tt-seg").forEach((btn) => {
+        btn.classList.toggle("tt-seg-active", btn.dataset.value === normalized);
+      });
+    }
+    if (normalized !== "paint") {
+      stopPaintDrag();
+    }
+    if (normalized !== "place") {
+      state.selectedPlacement = null;
+      renderTokenRoster();
+    }
+    updateInteractionModeUi();
+  }
+
+  function setTerrainBrush(brush) {
+    state.terrainBrush = brush || "erase";
+    if (elements.brushGroup) {
+      elements.brushGroup.querySelectorAll(".tt-brush").forEach((btn) => {
+        btn.classList.toggle("tt-seg-active", btn.dataset.value === state.terrainBrush);
+      });
+    }
+  }
+
+  function setTokenLayer(layer) {
+    const normalized = layer === "gm" ? "gm" : "tokens";
+    state.tokenLayer = normalized;
+    if (elements.layerGroup) {
+      elements.layerGroup.querySelectorAll(".tt-seg").forEach((btn) => {
+        btn.classList.toggle("tt-seg-active", btn.dataset.value === normalized);
+      });
+    }
   }
 
   function feetPerSquare(map = activeMap()) {
@@ -421,12 +474,103 @@
       return false;
     }
     state.paintDrag.paintedCells.add(key);
-    emit("map:paintTerrain", {
-      x,
-      y,
-      brush: elements.terrainBrush.value,
-    });
+    emit("map:paintTerrain", { x, y, brush: state.terrainBrush });
     return true;
+  }
+
+  function beginDragSelect(event) {
+    if (!activeMap() || isPaintModeActive() || isPlaceModeActive()) {
+      return;
+    }
+    state.dragSelect.active = true;
+    state.dragSelect.startClientX = event.clientX;
+    state.dragSelect.startClientY = event.clientY;
+    state.dragSelect.endClientX = event.clientX;
+    state.dragSelect.endClientY = event.clientY;
+    updateDragSelectBox();
+  }
+
+  function updateDragSelect(event) {
+    if (!state.dragSelect.active) {
+      return;
+    }
+    state.dragSelect.endClientX = event.clientX;
+    state.dragSelect.endClientY = event.clientY;
+    updateDragSelectBox();
+  }
+
+  function updateDragSelectBox() {
+    const box = elements.mapSelectBox;
+    if (!box || !elements.mapGridWrap) {
+      return;
+    }
+    const dx = Math.abs(state.dragSelect.endClientX - state.dragSelect.startClientX);
+    const dy = Math.abs(state.dragSelect.endClientY - state.dragSelect.startClientY);
+    if (dx < 4 && dy < 4) {
+      box.classList.add("tt-hidden");
+      return;
+    }
+    box.classList.remove("tt-hidden");
+    const rect = elements.mapGridWrap.getBoundingClientRect();
+    const scale = clamp(Number(state.mapView.scale) || 1, 0.45, 3.5);
+    const x1 = (Math.min(state.dragSelect.startClientX, state.dragSelect.endClientX) - rect.left) / scale;
+    const y1 = (Math.min(state.dragSelect.startClientY, state.dragSelect.endClientY) - rect.top) / scale;
+    const x2 = (Math.max(state.dragSelect.startClientX, state.dragSelect.endClientX) - rect.left) / scale;
+    const y2 = (Math.max(state.dragSelect.startClientY, state.dragSelect.endClientY) - rect.top) / scale;
+    box.style.left = `${x1}px`;
+    box.style.top = `${y1}px`;
+    box.style.width = `${x2 - x1}px`;
+    box.style.height = `${y2 - y1}px`;
+  }
+
+  function endDragSelect(event) {
+    if (!state.dragSelect.active) {
+      return;
+    }
+    state.dragSelect.active = false;
+    if (elements.mapSelectBox) {
+      elements.mapSelectBox.classList.add("tt-hidden");
+    }
+    const dx = Math.abs(state.dragSelect.endClientX - state.dragSelect.startClientX);
+    const dy = Math.abs(state.dragSelect.endClientY - state.dragSelect.startClientY);
+    if (dx < 4 && dy < 4) {
+      return;
+    }
+
+    const map = activeMap();
+    if (!map || !elements.mapGridWrap) {
+      return;
+    }
+    const rect = elements.mapGridWrap.getBoundingClientRect();
+    const scale = clamp(Number(state.mapView.scale) || 1, 0.45, 3.5);
+    const cellSize = state.tool.cellSize || 40;
+    const x1 = (Math.min(state.dragSelect.startClientX, state.dragSelect.endClientX) - rect.left) / scale;
+    const y1 = (Math.min(state.dragSelect.startClientY, state.dragSelect.endClientY) - rect.top) / scale;
+    const x2 = (Math.max(state.dragSelect.startClientX, state.dragSelect.endClientX) - rect.left) / scale;
+    const y2 = (Math.max(state.dragSelect.startClientY, state.dragSelect.endClientY) - rect.top) / scale;
+    const col1 = Math.floor(x1 / cellSize);
+    const row1 = Math.floor(y1 / cellSize);
+    const col2 = Math.floor(x2 / cellSize);
+    const row2 = Math.floor(y2 / cellSize);
+
+    const activeLayer = isDm() ? state.tokenLayer : "tokens";
+
+    if (!event || !event.shiftKey) {
+      state.selectedTokenIds.clear();
+    }
+    (map.tokens || []).forEach((token) => {
+      if (isDm() && token.layer !== activeLayer) {
+        return;
+      }
+      if (!canCurrentUserControlToken(token)) {
+        return;
+      }
+      if (token.x >= col1 && token.x <= col2 && token.y >= row1 && token.y <= row2) {
+        state.selectedTokenIds.add(token.id);
+      }
+    });
+    renderSelectedTokenControls();
+    renderMapGrid();
   }
 
   function activeTool() {
@@ -1304,13 +1448,8 @@
   }
 
   function resetMapInteractionMode() {
-    if (!elements.interactionMode) {
-      return;
-    }
-    elements.interactionMode.value = "move";
-    stopPaintDrag();
+    setInteractionMode("move");
     state.selectedPlacement = null;
-    updateInteractionModeUi();
     renderTokenRoster();
   }
 
@@ -1435,7 +1574,7 @@
       if (campaign.isDm) {
         const remove = document.createElement("button");
         remove.type = "button";
-        remove.textContent = "\u{1F5D1}";
+        remove.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" width="13" height="13" aria-hidden="true"><path d="M4 5h12" stroke-linecap="round"/><path d="M8 5V3h4v2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5l1 12h6l1-12" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="9" x2="9" y2="15" stroke-linecap="round"/><line x1="11" y1="9" x2="11" y2="15" stroke-linecap="round"/></svg>';
         remove.title = "Delete Campaign";
         remove.addEventListener("click", () => {
           if (!window.confirm(`Delete campaign ${campaign.name}?`)) {
@@ -1756,12 +1895,9 @@
     const toolMode = !paintMode && !placeMode;
     elements.mapGridWrap.classList.toggle("tt-mode-paint", paintMode);
     elements.mapGridWrap.classList.toggle("tt-mode-measure", toolMode);
-    if (elements.terrainBrush) {
-      elements.terrainBrush.disabled = placeMode;
-      const row = elements.terrainBrush.closest(".tt-row");
-      if (row) {
-        row.classList.toggle("is-disabled", placeMode);
-      }
+    if (elements.brushPanel) {
+      elements.brushPanel.style.opacity = placeMode ? "0.4" : "";
+      elements.brushPanel.style.pointerEvents = placeMode ? "none" : "";
     }
     if (elements.drawingLayerRow) {
       elements.drawingLayerRow.classList.toggle("tt-hidden", !isDm());
@@ -1804,7 +1940,7 @@
     emit("token:place", {
       x,
       y,
-      layer: elements.tokenLayerSelect.value,
+      layer: state.tokenLayer,
       ...placement,
     });
   }
@@ -1843,18 +1979,83 @@
       return;
     }
 
-    if (state.selectedTokenId) {
-      emit("token:move", {
-        tokenId: state.selectedTokenId,
-        x,
-        y,
-      });
+    if (state.selectedTokenIds.size === 1) {
+      const tokenId = [...state.selectedTokenIds][0];
+      emit("token:move", { tokenId, x, y });
       return;
     }
 
-    if (cell && cell.blockType === "door") {
+    if (state.selectedTokenIds.size === 0 && cell && cell.blockType === "door") {
       emit("map:interactDoor", { x, y });
     }
+
+    if (state.selectedTokenIds.size > 1) {
+      state.selectedTokenIds.clear();
+      renderSelectedTokenControls();
+      renderMapGrid();
+    }
+  }
+
+  function updateTerrainCellEl(el, cell) {
+    el.className = "tt-terrain-cell";
+    const blockType = cell.blockType || "empty";
+    if (blockType !== "empty") {
+      el.classList.add(`tt-terrain-${sanitizeId(blockType)}`);
+    }
+    if (blockType === "door" && cell.doorOpen) {
+      el.classList.add("tt-door-open");
+    }
+    if (cell.difficultType === "visible") {
+      el.classList.add("tt-difficult-visible");
+    }
+  }
+
+  function renderTerrainLayer() {
+    const map = activeMap();
+    const layer = elements.mapTerrainLayer;
+    if (!layer) {
+      return;
+    }
+    if (!map) {
+      layer.innerHTML = "";
+      state.terrainCellEls = [];
+      state.lastRenderedTerrain = null;
+      return;
+    }
+
+    const cellSize = state.tool.cellSize || 40;
+    const expectedCount = map.rows * map.cols;
+
+    if (state.terrainCellEls.length !== expectedCount) {
+      layer.innerHTML = "";
+      state.terrainCellEls = [];
+      map.terrain.forEach((row) => {
+        row.forEach((cell) => {
+          const div = document.createElement("div");
+          div.style.width = `${cellSize}px`;
+          div.style.height = `${cellSize}px`;
+          updateTerrainCellEl(div, cell);
+          layer.appendChild(div);
+          state.terrainCellEls.push(div);
+        });
+      });
+      state.lastRenderedTerrain = null;
+      return;
+    }
+
+    const terrainJson = JSON.stringify(map.terrain);
+    if (terrainJson === state.lastRenderedTerrain) {
+      return;
+    }
+    map.terrain.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        const el = state.terrainCellEls[y * map.cols + x];
+        if (el) {
+          updateTerrainCellEl(el, cell);
+        }
+      });
+    });
+    state.lastRenderedTerrain = terrainJson;
   }
 
   function renderMapGrid() {
@@ -1863,6 +2064,11 @@
     elements.mapGridTokens.innerHTML = "";
 
     if (!map) {
+      if (elements.mapTerrainLayer) {
+        elements.mapTerrainLayer.innerHTML = "";
+      }
+      state.terrainCellEls = [];
+      state.lastRenderedTerrain = null;
       clearMeasurementOverlay();
       applyMapViewTransform();
       return;
@@ -1873,6 +2079,10 @@
 
     elements.mapGridCells.style.gridTemplateColumns = `repeat(${map.cols}, ${cellSize}px)`;
     elements.mapGridCells.style.gridTemplateRows = `repeat(${map.rows}, ${cellSize}px)`;
+    if (elements.mapTerrainLayer) {
+      elements.mapTerrainLayer.style.gridTemplateColumns = `repeat(${map.cols}, ${cellSize}px)`;
+      elements.mapTerrainLayer.style.gridTemplateRows = `repeat(${map.rows}, ${cellSize}px)`;
+    }
     elements.mapGridTokens.style.gridTemplateColumns = `repeat(${map.cols}, ${cellSize}px)`;
     elements.mapGridTokens.style.gridTemplateRows = `repeat(${map.rows}, ${cellSize}px)`;
     elements.mapGridCells.style.backgroundImage = map.background && map.background.imageDataUrl
@@ -1888,21 +2098,6 @@
         const button = document.createElement("button");
         button.type = "button";
         button.className = "tt-cell";
-        button.classList.add(`tt-terrain-${sanitizeId(cell.blockType || "empty")}`);
-        if (cell.blockType === "door" && cell.doorOpen) {
-          button.classList.add("tt-door-open");
-        }
-        if (cell.difficultType === "visible") {
-          button.classList.add("tt-difficult-visible");
-        }
-
-        const label = tokenLabelFromSpecial(cell);
-        if (label) {
-          const special = document.createElement("div");
-          special.className = "tt-special";
-          special.textContent = label;
-          button.appendChild(special);
-        }
 
         button.addEventListener("mousedown", (event) => {
           if (event.button !== 0) {
@@ -1920,6 +2115,11 @@
             event.preventDefault();
             beginMeasureDrag(x, y, cellSize);
             renderMeasurementOverlay();
+            return;
+          }
+          if (!isPaintModeActive() && !isPlaceModeActive() && !isToolInteractionEnabled()) {
+            event.preventDefault();
+            beginDragSelect(event);
           }
         });
 
@@ -1980,7 +2180,7 @@
           String(clamp(Number(map.gmTokenOpacity) || 0.55, 0.1, 1))
         );
       }
-      if (token.id === state.selectedTokenId) {
+      if (state.selectedTokenIds.has(token.id)) {
         tokenEl.classList.add("tt-token-selected");
       }
 
@@ -2014,10 +2214,22 @@
         }
         event.preventDefault();
         event.stopPropagation();
-        if (state.selectedTokenId === token.id) {
-          state.selectedTokenId = null;
+        if (!canCurrentUserControlToken(token)) {
+          return;
+        }
+        if (event.shiftKey) {
+          if (state.selectedTokenIds.has(token.id)) {
+            state.selectedTokenIds.delete(token.id);
+          } else {
+            state.selectedTokenIds.add(token.id);
+          }
         } else {
-          state.selectedTokenId = token.id;
+          if (state.selectedTokenIds.has(token.id) && state.selectedTokenIds.size === 1) {
+            state.selectedTokenIds.clear();
+          } else {
+            state.selectedTokenIds.clear();
+            state.selectedTokenIds.add(token.id);
+          }
         }
         renderSelectedTokenControls();
         renderMapGrid();
@@ -2092,8 +2304,7 @@
         name: entry.name,
         tokenImage: entry.tokenImage || "",
       };
-      elements.interactionMode.value = "place";
-      updateInteractionModeUi();
+      setInteractionMode("place");
       setStatus(`Selected ${entry.name} for placement.`);
       renderTokenRoster();
     };
@@ -2180,17 +2391,16 @@
   }
 
   function renderSelectedTokenControls() {
-    if (!isDm() || !state.selectedTokenId) {
+    if (!isDm() || state.selectedTokenIds.size === 0) {
       elements.selectedTokenControls.classList.add("tt-hidden");
       return;
     }
-
-    const token = getTokenById(state.selectedTokenId);
-    if (!token) {
+    const anyValid = [...state.selectedTokenIds].some((id) => getTokenById(id));
+    if (!anyValid) {
+      state.selectedTokenIds.clear();
       elements.selectedTokenControls.classList.add("tt-hidden");
       return;
     }
-
     elements.selectedTokenControls.classList.remove("tt-hidden");
   }
 
@@ -2867,6 +3077,7 @@
     renderMaps();
     renderRollAndInjurySelectors();
     renderMapGrid();
+    renderTerrainLayer();
     renderLogs();
     renderInitiativePanel();
     renderMapAndInitiativeSummary();
@@ -3273,8 +3484,7 @@
           name,
           tokenImage,
         };
-        elements.interactionMode.value = "place";
-        updateInteractionModeUi();
+        setInteractionMode("place");
         renderTokenRoster();
         setStatus(`Selected custom token ${name}.`);
       } catch (error) {
@@ -3312,61 +3522,73 @@
     });
   }
 
-  elements.interactionMode.addEventListener("change", () => {
-    if (elements.interactionMode.value !== "paint") {
-      stopPaintDrag();
-    }
-    if (elements.interactionMode.value !== "place") {
-      state.selectedPlacement = null;
-      renderTokenRoster();
-    }
-    updateInteractionModeUi();
-  });
+  if (elements.modeGroup) {
+    elements.modeGroup.addEventListener("click", (event) => {
+      const btn = event.target.closest(".tt-seg");
+      if (!btn || !btn.dataset.value) {
+        return;
+      }
+      setInteractionMode(btn.dataset.value);
+    });
+  }
+
+  if (elements.brushGroup) {
+    elements.brushGroup.addEventListener("click", (event) => {
+      const btn = event.target.closest(".tt-brush");
+      if (!btn || !btn.dataset.value) {
+        return;
+      }
+      setTerrainBrush(btn.dataset.value);
+    });
+  }
+
+  if (elements.layerGroup) {
+    elements.layerGroup.addEventListener("click", (event) => {
+      const btn = event.target.closest(".tt-seg");
+      if (!btn || !btn.dataset.value) {
+        return;
+      }
+      setTokenLayer(btn.dataset.value);
+    });
+  }
 
   elements.tokenLayerToTokens.addEventListener("click", () => {
-    if (!state.selectedTokenId) {
-      return;
-    }
-    emit("token:setLayer", {
-      tokenId: state.selectedTokenId,
-      layer: "tokens",
+    state.selectedTokenIds.forEach((tokenId) => {
+      emit("token:setLayer", { tokenId, layer: "tokens" });
     });
   });
 
   elements.tokenLayerToGm.addEventListener("click", () => {
-    if (!state.selectedTokenId) {
-      return;
-    }
-    emit("token:setLayer", {
-      tokenId: state.selectedTokenId,
-      layer: "gm",
+    state.selectedTokenIds.forEach((tokenId) => {
+      emit("token:setLayer", { tokenId, layer: "gm" });
     });
   });
 
   elements.tokenDelete.addEventListener("click", () => {
-    if (!state.selectedTokenId) {
+    if (state.selectedTokenIds.size === 0) {
       return;
     }
-    if (!window.confirm("Delete selected token?")) {
+    const count = state.selectedTokenIds.size;
+    if (!window.confirm(`Delete ${count} selected token${count > 1 ? "s" : ""}?`)) {
       return;
     }
-    emit("token:delete", {
-      tokenId: state.selectedTokenId,
+    state.selectedTokenIds.forEach((tokenId) => {
+      emit("token:delete", { tokenId });
     });
-    state.selectedTokenId = null;
+    state.selectedTokenIds.clear();
+    renderSelectedTokenControls();
   });
 
   elements.tokenToggleAuto.addEventListener("click", () => {
-    if (!state.selectedTokenId) {
+    if (state.selectedTokenIds.size === 0) {
       return;
     }
-    const token = getTokenById(state.selectedTokenId);
-    if (!token) {
-      return;
-    }
-    emit("token:update", {
-      tokenId: token.id,
-      autoMove: !token.autoMove,
+    state.selectedTokenIds.forEach((tokenId) => {
+      const token = getTokenById(tokenId);
+      if (!token) {
+        return;
+      }
+      emit("token:update", { tokenId: token.id, autoMove: !token.autoMove });
     });
   });
 
@@ -3528,19 +3750,20 @@
       { passive: false }
     );
     elements.boardWrap.addEventListener("mousedown", (event) => {
-      if (event.button !== 1 && event.button !== 2) {
+      if (event.button === 1 || (event.button === 2 && !(isToolInteractionEnabled() && state.tool.preview))) {
+        event.preventDefault();
+        startMapPan(event);
         return;
       }
-      if (event.button === 2 && isToolInteractionEnabled() && state.tool.preview) {
-        return;
+      if (event.button === 0 && event.target === elements.boardWrap) {
+        beginDragSelect(event);
       }
-      event.preventDefault();
-      startMapPan(event);
     });
   }
 
   window.addEventListener("mousemove", (event) => {
     continueMapPan(event);
+    updateDragSelect(event);
     if (!state.tool.dragging || !isToolInteractionEnabled()) {
       return;
     }
@@ -3551,10 +3774,11 @@
     updateMeasureDrag(cell.x, cell.y, state.tool.cellSize);
   });
 
-  window.addEventListener("mouseup", () => {
+  window.addEventListener("mouseup", (event) => {
     stopPaintDrag();
     endMeasureDrag();
     stopMapPan();
+    endDragSelect(event);
   });
 
   window.addEventListener("resize", () => {
@@ -3565,6 +3789,28 @@
     if (event.key !== "Delete" && event.key !== "Backspace") {
       return;
     }
+    const focused = document.activeElement;
+    if (focused && (focused.tagName === "INPUT" || focused.tagName === "TEXTAREA" || focused.isContentEditable)) {
+      return;
+    }
+
+    if (state.selectedTokenIds.size > 0) {
+      const deletable = [...state.selectedTokenIds].filter((id) => {
+        const token = getTokenById(id);
+        return token && canCurrentUserControlToken(token);
+      });
+      if (deletable.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      deletable.forEach((tokenId) => {
+        emit("token:delete", { tokenId });
+      });
+      state.selectedTokenIds.clear();
+      renderSelectedTokenControls();
+      return;
+    }
+
     if (!state.tool.selectedDrawingId) {
       return;
     }

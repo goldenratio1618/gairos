@@ -157,7 +157,7 @@ body {
   grid-area: main;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -178,21 +178,19 @@ body {
   min-width: 0;
 }
 
-.tt-main-header {
-  background: linear-gradient(165deg, #1d2623, #121917);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* Status overlay (replaced old header) */
+.tt-map-status {
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding: 3px 10px;
+  text-align: center;
+  letter-spacing: 0.04em;
+  min-height: 22px;
+  flex-shrink: 0;
 }
 
-.tt-main-header h1 {
-  margin: 0;
-  font-family: "Spectral SC", "Palatino Linotype", serif;
-  letter-spacing: 0.06em;
-  font-size: 1.4rem;
+.tt-map-status.tt-status-error {
+  color: #ff8a8a;
 }
 
 .tt-card {
@@ -313,10 +311,21 @@ body {
   pointer-events: auto;
 }
 
+/* Terrain layer – purely visual, no pointer events */
+.tt-terrain-layer {
+  pointer-events: none !important;
+}
+
+.tt-terrain-cell {
+  width: 40px;
+  height: 40px;
+  position: relative;
+}
+
 .tt-cell {
   width: 40px;
   height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(10, 15, 13, 0.55);
   position: relative;
   padding: 0;
@@ -330,47 +339,268 @@ body {
   pointer-events: none;
 }
 
+/* ─── Terrain textures ─── */
+
 .tt-terrain-stone_wall {
-  background: repeating-linear-gradient(45deg, #4e575a 0 4px, #5f696d 4px 8px);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 18px, rgba(0,0,0,0.35) 18px 20px),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(0,0,0,0.35) 18px 20px),
+    #52595d;
 }
 
 .tt-terrain-wooden_wall {
-  background: repeating-linear-gradient(90deg, #523824 0 5px, #6f4f36 5px 10px);
-}
-
-.tt-terrain-window {
-  background: linear-gradient(135deg, rgba(110, 210, 229, 0.35), rgba(84, 172, 193, 0.6));
-}
-
-.tt-terrain-door {
-  background: linear-gradient(135deg, #8b693d, #b38758);
-}
-
-.tt-terrain-door.tt-door-open {
-  background: linear-gradient(135deg, #ad9a81, #d5c3a7);
-  opacity: 0.55;
-}
-
-.tt-difficult-visible::after {
   background:
     repeating-linear-gradient(
-      -45deg,
-      rgba(203, 79, 53, 0.6) 0 4px,
-      rgba(203, 79, 53, 0.15) 4px 8px
+      90deg,
+      #3d2614 0px 3px,
+      #5a3a20 3px 7px,
+      #6f4f30 7px 9px,
+      #4e3219 9px 12px,
+      #5c3d24 12px 14px,
+      #7a5535 14px 18px,
+      #3d2614 18px 21px
     );
 }
 
-.tt-special {
+.tt-terrain-window {
+  background:
+    linear-gradient(135deg,
+      rgba(80, 200, 230, 0.55) 0%,
+      rgba(100, 195, 212, 0.7) 40%,
+      rgba(60, 160, 195, 0.5) 100%
+    );
+  border: 1px solid rgba(100, 195, 212, 0.6);
+}
+
+.tt-terrain-door {
+  background:
+    linear-gradient(180deg,
+      #7a5230 0%,
+      #9b6b42 30%,
+      #b3804f 55%,
+      #9b6b42 80%,
+      #7a5230 100%
+    );
+  border: 1px solid rgba(160, 110, 60, 0.6);
+}
+
+.tt-terrain-door.tt-door-open {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(180, 155, 110, 0.6) 0px 2px,
+      rgba(210, 185, 145, 0.4) 2px 6px
+    );
+  opacity: 0.65;
+}
+
+.tt-terrain-empty.tt-difficult-visible::after,
+.tt-difficult-visible::after {
+  content: "";
   position: absolute;
   inset: 0;
-  font-size: 0.58rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #f7f7f7;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(220, 80, 45, 0.55) 0 3px,
+      rgba(180, 60, 30, 0.12) 3px 7px
+    );
   pointer-events: none;
 }
+
+/* ─── Segmented controls (mode / layer) ─── */
+
+.tt-mapctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tt-mapctrl-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  min-width: 36px;
+}
+
+.tt-seg-group {
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.tt-seg {
+  flex: 1;
+  border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 9, 0.55);
+  color: var(--muted);
+  font-size: 0.73rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  padding: 5px 4px;
+  transition: background 120ms, color 120ms;
+  white-space: nowrap;
+}
+
+.tt-seg:last-child {
+  border-right: none;
+}
+
+.tt-seg:hover {
+  background: rgba(217, 164, 65, 0.1);
+  color: var(--text);
+}
+
+.tt-seg-active {
+  background: linear-gradient(145deg, rgba(217, 164, 65, 0.3), rgba(180, 130, 35, 0.22)) !important;
+  color: #f5dfa0 !important;
+  border-color: rgba(217, 164, 65, 0.35) !important;
+}
+
+/* ─── Brush palette ─── */
+
+#brush-panel {
+  align-items: flex-start;
+}
+
+.tt-brush-palette {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  flex: 1;
+}
+
+.tt-brush {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.6rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transition: border-color 120ms, box-shadow 120ms;
+  overflow: hidden;
+  position: relative;
+}
+
+.tt-brush:hover {
+  border-color: rgba(217, 164, 65, 0.5);
+}
+
+.tt-brush.tt-seg-active {
+  border-color: rgba(217, 164, 65, 0.9) !important;
+  box-shadow: 0 0 0 1px rgba(217, 164, 65, 0.4), inset 0 0 0 1px rgba(217, 164, 65, 0.2);
+}
+
+.tt-brush-erase {
+  background: rgba(7, 10, 9, 0.7);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.tt-brush-stone {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 8px, rgba(0,0,0,0.3) 8px 9px),
+    repeating-linear-gradient(90deg, transparent 0 8px, rgba(0,0,0,0.3) 8px 9px),
+    #52595d;
+}
+
+.tt-brush-wood {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #3d2614 0px 2px,
+      #5a3a20 2px 5px,
+      #6f4f30 5px 6px,
+      #4e3219 6px 8px,
+      #5c3d24 8px 9px,
+      #7a5535 9px 11px,
+      #3d2614 11px 13px
+    );
+}
+
+.tt-brush-window {
+  background: linear-gradient(135deg, rgba(80, 200, 230, 0.7), rgba(60, 160, 195, 0.85));
+}
+
+.tt-brush-door-locked {
+  background: linear-gradient(180deg, #7a5230 0%, #b3804f 50%, #7a5230 100%);
+}
+
+.tt-brush-door-locked::after {
+  content: "🔒";
+  font-size: 0.6rem;
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  line-height: 1;
+}
+
+.tt-brush-door-unlocked {
+  background: linear-gradient(180deg, #7a5230 0%, #b3804f 50%, #7a5230 100%);
+}
+
+.tt-brush-door-unlocked::after {
+  content: "🔓";
+  font-size: 0.6rem;
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  line-height: 1;
+}
+
+.tt-brush-door-open {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(180, 155, 110, 0.6) 0px 2px,
+      rgba(210, 185, 145, 0.35) 2px 5px
+    );
+}
+
+.tt-brush-difficult {
+  background: rgba(10, 15, 13, 0.6);
+  background-image:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(220, 80, 45, 0.6) 0 2px,
+      rgba(180, 60, 30, 0.12) 2px 5px
+    );
+}
+
+.tt-brush-difficult-hid {
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(100, 60, 45, 0.7) 0 2px,
+      rgba(60, 30, 20, 0.2) 2px 5px
+    );
+}
+
+.tt-brush-clear-diff {
+  background: rgba(7, 10, 9, 0.7);
+  color: var(--ok);
+  font-size: 0.85rem;
+}
+
+/* ─── Token select box ─── */
+
+.tt-select-box {
+  position: absolute;
+  border: 1.5px dashed rgba(217, 164, 65, 0.8);
+  background: rgba(217, 164, 65, 0.07);
+  pointer-events: none;
+  border-radius: 3px;
+}
+
+/* ─── Token ─── */
 
 .tt-token {
   position: relative;
@@ -528,8 +758,8 @@ body {
   resize: vertical;
 }
 
-.tt-card button,
-.tt-form button,
+.tt-card button:not(.tt-brush):not(.tt-seg),
+.tt-form button:not(.tt-brush):not(.tt-seg),
 .tt-chat-form button {
   border: none;
   border-radius: 8px;
@@ -541,7 +771,7 @@ body {
   cursor: pointer;
 }
 
-.tt-card button:hover,
+.tt-card button:not(.tt-brush):not(.tt-seg):hover,
 .tt-chat-form button:hover {
   filter: brightness(1.08);
 }
@@ -713,7 +943,7 @@ body {
   color: var(--muted);
 }
 
-.tt-checkline input[type=\"checkbox\"] {
+.tt-checkline input[type="checkbox"] {
   width: 14px;
   height: 14px;
 }
@@ -880,7 +1110,8 @@ body {
     min-width: 0;
   }
 
-  .tt-cell {
+  .tt-cell,
+  .tt-terrain-cell {
     width: 34px;
     height: 34px;
   }

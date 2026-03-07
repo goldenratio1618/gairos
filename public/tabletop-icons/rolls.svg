@@ -1,6 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
   <rect x="3" y="3" width="42" height="42" rx="10" fill="#1e2725" stroke="#d9a441" stroke-width="2"/>
-  <polygon points="24,8 35,16 31,32 17,32 13,16" stroke="#d9a441" stroke-width="2" fill="none"/>
-  <path d="M24 8v24M13 16h22M17 32l18-16M31 32L13 16" stroke="#d9a441" stroke-width="1.6" opacity="0.85"/>
-  <circle cx="24" cy="22" r="2.2" fill="#d9a441"/>
+  <!-- d20 outer triangle -->
+  <polygon points="24,7 41,38 7,38" fill="rgba(217,164,65,0.09)" stroke="#d9a441" stroke-width="2"/>
+  <!-- upper facet divider -->
+  <line x1="15" y1="24" x2="33" y2="24" stroke="#d9a441" stroke-width="1.4" stroke-opacity="0.72"/>
+  <!-- left upper facet line -->
+  <line x1="24" y1="7" x2="15" y2="24" stroke="#d9a441" stroke-width="1.1" stroke-opacity="0.6"/>
+  <!-- right upper facet line -->
+  <line x1="24" y1="7" x2="33" y2="24" stroke="#d9a441" stroke-width="1.1" stroke-opacity="0.6"/>
+  <!-- lower left facet line -->
+  <line x1="15" y1="24" x2="7" y2="38" stroke="#d9a441" stroke-width="0.8" stroke-opacity="0.4"/>
+  <!-- lower right facet line -->
+  <line x1="33" y1="24" x2="41" y2="38" stroke="#d9a441" stroke-width="0.8" stroke-opacity="0.4"/>
+  <!-- 20 label in lower face -->
+  <text x="24" y="35" text-anchor="middle" fill="#d9a441" font-size="9" font-family="'IBM Plex Sans',sans-serif" font-weight="700" letter-spacing="-0.5">20</text>
 </svg>

@@ -84,7 +84,9 @@
           <div class="tt-grid3 tt-inline-controls">
             <select id="character-select"></select>
             <button id="character-new-button" type="button" class="tt-icon-button" title="New Character">+</button>
-            <button id="character-delete-button" type="button" class="tt-icon-button tt-danger" title="Delete Character">&#128465;</button>
+            <button id="character-delete-button" type="button" class="tt-icon-button tt-danger" title="Delete Character">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" width="14" height="14" aria-hidden="true"><path d="M4 5h12" stroke-linecap="round"/><path d="M8 5V3h4v2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5l1 12h6l1-12" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="9" x2="9" y2="15" stroke-linecap="round"/><line x1="11" y1="9" x2="11" y2="15" stroke-linecap="round"/></svg>
+            </button>
           </div>
           <div id="character-token-preview" class="tt-token-preview">
             <div id="character-token-badge" class="tt-token-badge">?</div>
@@ -141,7 +143,9 @@
           <div class="tt-grid3 tt-inline-controls">
             <select id="map-select"></select>
             <button id="map-new" type="button" class="tt-icon-button" title="New Map">+</button>
-            <button id="map-delete" type="button" class="tt-icon-button tt-danger" title="Delete Map">&#128465;</button>
+            <button id="map-delete" type="button" class="tt-icon-button tt-danger" title="Delete Map">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" width="14" height="14" aria-hidden="true"><path d="M4 5h12" stroke-linecap="round"/><path d="M8 5V3h4v2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5l1 12h6l1-12" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="9" x2="9" y2="15" stroke-linecap="round"/><line x1="11" y1="9" x2="11" y2="15" stroke-linecap="round"/></svg>
+            </button>
           </div>
           <label class="tt-field" for="map-name">Map Name (double-click to edit)</label>
           <input id="map-name" type="text" placeholder="Map name" readonly />
@@ -156,11 +160,11 @@
             </div>
           </div>
           <div class="tt-row">
-            <label for="map-grid-feet">Feet per Square</label>
+            <label for="map-grid-feet">Feet/Square</label>
             <input id="map-grid-feet" type="number" min="1" max="200" value="5" />
           </div>
           <div class="tt-row">
-            <label for="map-gm-opacity">GM Token Opacity</label>
+            <label for="map-gm-opacity">GM Opacity</label>
             <div class="tt-slider-row">
               <input id="map-gm-opacity" type="range" min="0.1" max="1" step="0.05" value="0.55" />
               <span id="map-gm-opacity-value">55%</span>
@@ -169,49 +173,49 @@
           <label class="tt-file-label" for="map-background-input">Background Image</label>
           <input id="map-background-input" type="file" accept="image/*" />
 
-          <div class="tt-row">
-            <label for="interaction-mode">Mode</label>
-            <select id="interaction-mode">
-              <option value="move">Move</option>
-              <option value="paint">Paint Terrain</option>
-              <option value="place">Place Tokens</option>
-            </select>
+          <div class="tt-mapctrl">
+            <div class="tt-mapctrl-label">Mode</div>
+            <div class="tt-seg-group" id="mode-group">
+              <button type="button" class="tt-seg tt-seg-active" data-value="move" title="Move tokens">Move</button>
+              <button type="button" class="tt-seg" data-value="paint" title="Paint terrain">Paint</button>
+              <button type="button" class="tt-seg" data-value="place" title="Place tokens">Place</button>
+            </div>
           </div>
 
-          <div class="tt-row">
-            <label for="terrain-brush">Brush</label>
-            <select id="terrain-brush">
-              <option value="erase">Erase</option>
-              <option value="stone_wall">Stone Wall</option>
-              <option value="wooden_wall">Wooden Wall</option>
-              <option value="window">Window</option>
-              <option value="door_locked">Door (Locked)</option>
-              <option value="door_unlocked">Door (Unlocked)</option>
-              <option value="door_open">Door (Open)</option>
-              <option value="difficult_visible">Difficult Terrain (Visible)</option>
-              <option value="difficult_hidden">Difficult Terrain (Hidden)</option>
-              <option value="difficult_clear">Clear Difficult Terrain</option>
-            </select>
+          <div class="tt-mapctrl" id="brush-panel">
+            <div class="tt-mapctrl-label">Brush</div>
+            <div class="tt-brush-palette" id="brush-group">
+              <button type="button" class="tt-brush tt-brush-erase tt-seg-active" data-value="erase" title="Erase terrain">✕</button>
+              <button type="button" class="tt-brush tt-brush-stone" data-value="stone_wall" title="Stone Wall"></button>
+              <button type="button" class="tt-brush tt-brush-wood" data-value="wooden_wall" title="Wooden Wall"></button>
+              <button type="button" class="tt-brush tt-brush-window" data-value="window" title="Window"></button>
+              <button type="button" class="tt-brush tt-brush-door-locked" data-value="door_locked" title="Door (Locked)"></button>
+              <button type="button" class="tt-brush tt-brush-door-unlocked" data-value="door_unlocked" title="Door (Unlocked)"></button>
+              <button type="button" class="tt-brush tt-brush-door-open" data-value="door_open" title="Door (Open)"></button>
+              <button type="button" class="tt-brush tt-brush-difficult" data-value="difficult_visible" title="Difficult (Visible)"></button>
+              <button type="button" class="tt-brush tt-brush-difficult-hid" data-value="difficult_hidden" title="Difficult (Hidden)"></button>
+              <button type="button" class="tt-brush tt-brush-clear-diff" data-value="difficult_clear" title="Clear Difficult">✓</button>
+            </div>
           </div>
 
-          <div class="tt-row">
-            <label for="token-layer-select">Placement Layer</label>
-            <select id="token-layer-select">
-              <option value="tokens">Tokens Layer</option>
-              <option value="gm">GM Layer</option>
-            </select>
+          <div class="tt-mapctrl">
+            <div class="tt-mapctrl-label">Layer</div>
+            <div class="tt-seg-group" id="layer-group">
+              <button type="button" class="tt-seg tt-seg-active" data-value="tokens" title="Place on tokens layer">Tokens</button>
+              <button type="button" class="tt-seg" data-value="gm" title="GM hidden layer">GM</button>
+            </div>
           </div>
 
           <input id="custom-token-file" type="file" accept="image/*" class="tt-hidden" />
           <div id="token-roster" class="tt-list"></div>
           <div id="selected-token-controls" class="tt-hidden">
             <div class="tt-grid2">
-              <button id="token-layer-to-tokens" type="button">Move to Tokens</button>
-              <button id="token-layer-to-gm" type="button">Move to GM</button>
+              <button id="token-layer-to-tokens" type="button">→ Tokens</button>
+              <button id="token-layer-to-gm" type="button">→ GM</button>
             </div>
             <div class="tt-grid2">
-              <button id="token-toggle-auto" type="button">Toggle Auto-Move</button>
-              <button id="token-delete" type="button">Delete Token</button>
+              <button id="token-toggle-auto" type="button">Toggle Auto</button>
+              <button id="token-delete" type="button">Delete</button>
             </div>
           </div>
         </section>
@@ -353,21 +357,20 @@
       </aside>
 
       <main class="tt-main">
-        <header class="tt-main-header">
-          <h1>Gairos Tabletop</h1>
-          <div id="main-status">Connecting...</div>
-        </header>
         <section class="tt-board" id="board-wrap">
           <div id="map-grid-wrap" class="tt-grid-wrap">
             <div id="map-grid-cells" class="tt-grid"></div>
+            <div id="map-terrain-layer" class="tt-grid tt-grid-overlay tt-terrain-layer"></div>
             <div id="map-grid-tokens" class="tt-grid tt-grid-overlay"></div>
             <svg id="map-measure-overlay" class="tt-measure-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
               <g id="map-drawings-layer"></g>
               <g id="map-preview-layer"></g>
             </svg>
             <div id="map-measure-label" class="tt-measure-label tt-hidden">0 ft</div>
+            <div id="map-select-box" class="tt-select-box tt-hidden"></div>
           </div>
         </section>
+        <div id="main-status" class="tt-map-status tt-hidden"></div>
       </main>
 
       <aside class="tt-right" id="log-panel">
