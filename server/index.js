@@ -8,6 +8,8 @@ const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
 const DM_PASSWORD = String(process.env.GAIROS_DM_PASSWORD || "python");
 const DM_COOKIE_NAME = "gairos-dm-auth";
+const TERRAIN_TEXTURE_ROOT =
+  process.env.GAIROS_TEXTURE_LIBRARY || "/mnt/d/Dropbox/TabletopRPGs/textures";
 
 function normalizeAddress(address) {
   if (!address) {
@@ -144,6 +146,7 @@ app.post("/dm-auth", (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, "..", "public")));
+app.use("/texture-library", express.static(path.join(TERRAIN_TEXTURE_ROOT, "extracted")));
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -164,6 +167,7 @@ io.use((socket, next) => {
 createTabletopSystem(io, {
   dataDirectory: path.join(__dirname, "..", "generated", "tabletop"),
   dmPassword: DM_PASSWORD,
+  textureLibraryRoot: TERRAIN_TEXTURE_ROOT,
 });
 
 server.listen(PORT, HOST, () => {

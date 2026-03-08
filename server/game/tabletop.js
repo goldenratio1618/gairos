@@ -1,22 +1,34 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const {
+  DEFAULT_TERRAIN_TEXTURE_ROOT,
+  applyTerrainOps,
+  buildResolvedTextureDefaults,
+  buildTextureCatalog,
+  cloneVisibleMapForRole,
+  createLayerOnMap,
+  deleteLayerFromMap,
+  ensureTerrainLayers,
+  findDoorComponentAt,
+  getTerrainLayerById,
+  getTopTerrainComponent,
+  importBackgroundIntoLayer,
+  isTileBlockingMovement,
+  normalizeCampaignTerrainDefaults,
+  normalizeTextureDefaults,
+  reorderLayersOnMap,
+  resizeTerrainForMap,
+  serializeTextureCatalogForClient,
+} = require("./terrain");
 
 const TABLETOP_NAMESPACE = "/tabletop";
 const DEFAULT_GRID_ROWS = 20;
 const DEFAULT_GRID_COLS = 30;
-const DEFAULT_CELL = {
-  blockType: "empty",
-  doorLocked: false,
-  doorOpen: false,
-  difficultType: "none",
-  specialType: null,
-};
-const TERRAIN_BLOCKERS = new Set(["stone_wall", "wooden_wall", "window"]);
 const HERB_SHEET_ID = "1_ly4-3ykWpQ47oDLyF2hDewntCJ4QR6hImODhmwNlYg";
 const HERB_SHEET_NAME = "RULES_HERBS";
-const MAX_MAP_BACKGROUND_DATA_URL_LENGTH = 10_000_000;
 const DEFAULT_GM_TOKEN_OPACITY = 0.55;
+let activeTextureCatalog = buildTextureCatalog(DEFAULT_TERRAIN_TEXTURE_ROOT);
 
 const ROLL_MODIFIER_CATALOG = {
   guidance: {
@@ -875,38 +887,7 @@ async function loadHerbDatabase() {
   return herbs;
 }
 
-function makeEmptyGrid(rows, cols) {
-  const grid = [];
-  for (let y = 0; y < rows; y += 1) {
-    const row = [];
-    for (let x = 0; x < cols; x += 1) {
-      row.push({ ...DEFAULT_CELL });
-    }
-    grid.push(row);
-  }
-  return grid;
-}
-
-function resizeTerrainGrid(existingTerrain, rows, cols) {
-  const resized = [];
-  const source = Array.isArray(existingTerrain) ? existingTerrain : [];
-  for (let y = 0; y < rows; y += 1) {
-    const nextRow = [];
-    const sourceRow = Array.isArray(source[y]) ? source[y] : [];
-    for (let x = 0; x < cols; x += 1) {
-      const sourceCell = sourceRow[x] && typeof sourceRow[x] === "object" ? sourceRow[x] : null;
-      nextRow.push({
-        ...DEFAULT_CELL,
-        ...(sourceCell || {}),
-        specialType: null,
-      });
-    }
-    resized.push(nextRow);
-  }
-  return resized;
-}
-
-function resizeMapInPlace(map, rows, cols) {
+function resizeMapInPlace(map, rows, cols, textureCatalog = activeTextureCatalog) {
   if (!map) {
     return;
   }
@@ -915,7 +896,7 @@ function resizeMapInPlace(map, rows, cols) {
   if (map.rows === nextRows && map.cols === nextCols) {
     return;
   }
-  map.terrain = resizeTerrainGrid(map.terrain, nextRows, nextCols);
+  resizeTerrainForMap(map, nextRows, nextCols, textureCatalog, createId);
   map.rows = nextRows;
   map.cols = nextCols;
   if (Array.isArray(map.tokens)) {
@@ -926,11 +907,11 @@ function resizeMapInPlace(map, rows, cols) {
   }
 }
 
-function createMap({ name, rows, cols, feetPerCell = 5 }) {
+function createMap({ name, rows, cols, feetPerCell = 5, textureCatalog = activeTextureCatalog }) {
   const safeRows = clamp(Number.parseInt(rows, 10) || DEFAULT_GRID_ROWS, 5, 80);
   const safeCols = clamp(Number.parseInt(cols, 10) || DEFAULT_GRID_COLS, 5, 80);
   const safeFeetPerCell = clamp(Number.parseFloat(feetPerCell) || 5, 1, 200);
-  return {
+  const map = {
     id: createId("map"),
     name: String(name || "New Map").slice(0, 120),
     rows: safeRows,
@@ -941,12 +922,15 @@ function createMap({ name, rows, cols, feetPerCell = 5 }) {
     background: {
       imageDataUrl: "",
     },
-    terrain: makeEmptyGrid(safeRows, safeCols),
+    terrainVersion: 2,
+    terrainLayers: [],
     tokens: [],
     drawings: [],
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
+  ensureTerrainLayers(map, textureCatalog, createId);
+  return map;
 }
 
 function normalizeUserUsername(username) {
@@ -980,42 +964,7 @@ function verifyPassword(user, password) {
 }
 
 function getTerrainCell(map, x, y) {
-  if (!map || !Array.isArray(map.terrain)) {
-    return null;
-  }
-  if (y < 0 || y >= map.rows || x < 0 || x >= map.cols) {
-    return null;
-  }
-  return map.terrain[y][x] || null;
-}
-
-function isCellBlockingMovement(cell) {
-  if (!cell) {
-    return true;
-  }
-  if (TERRAIN_BLOCKERS.has(cell.blockType)) {
-    return true;
-  }
-  if (cell.blockType === "door" && !cell.doorOpen) {
-    return true;
-  }
-  return false;
-}
-
-function isCellBlockingSight(cell) {
-  if (!cell) {
-    return true;
-  }
-  if (cell.blockType === "window") {
-    return false;
-  }
-  if (TERRAIN_BLOCKERS.has(cell.blockType)) {
-    return true;
-  }
-  if (cell.blockType === "door" && !cell.doorOpen) {
-    return true;
-  }
-  return false;
+  return getTopTerrainComponent(map, x, y);
 }
 
 function findTokenById(map, tokenId) {
@@ -1078,14 +1027,11 @@ function computePathAndCost(map, token, targetX, targetY) {
         continue;
       }
       const cell = getTerrainCell(map, nx, ny);
-      if (isCellBlockingMovement(cell)) {
+      if (isTileBlockingMovement(cell)) {
         continue;
       }
 
       let stepCost = 5;
-      if (cell && cell.difficultType !== "none") {
-        stepCost *= 2;
-      }
       if (getTokenAtPosition(map, nx, ny, token.id)) {
         stepCost *= 2;
       }
@@ -1349,6 +1295,12 @@ function normalizeMapShape(map) {
   if (!map || typeof map !== "object") {
     return null;
   }
+  map.id = map.id || createId("map");
+  map.name = String(map.name || "Map").slice(0, 120);
+  map.rows = clamp(Number.parseInt(map.rows, 10) || DEFAULT_GRID_ROWS, 5, 80);
+  map.cols = clamp(Number.parseInt(map.cols, 10) || DEFAULT_GRID_COLS, 5, 80);
+  map.createdAt = map.createdAt || nowIso();
+  map.updatedAt = map.updatedAt || nowIso();
   map.scenarioType = "standard";
   if (!Number.isFinite(map.feetPerCell) || Number(map.feetPerCell) <= 0) {
     map.feetPerCell = 5;
@@ -1363,17 +1315,7 @@ function normalizeMapShape(map) {
   if (typeof map.background.imageDataUrl !== "string") {
     map.background.imageDataUrl = "";
   }
-  if (!Array.isArray(map.terrain) || map.terrain.length === 0) {
-    map.terrain = makeEmptyGrid(map.rows || DEFAULT_GRID_ROWS, map.cols || DEFAULT_GRID_COLS);
-  } else {
-    map.terrain = map.terrain.map((row) =>
-      (Array.isArray(row) ? row : []).map((cell) => ({
-        ...DEFAULT_CELL,
-        ...(cell && typeof cell === "object" ? cell : {}),
-        specialType: null,
-      }))
-    );
-  }
+  ensureTerrainLayers(map, activeTextureCatalog, createId);
   if (!Array.isArray(map.tokens)) {
     map.tokens = [];
   }
@@ -1399,6 +1341,7 @@ function createCampaign({
   maps = null,
   scene = null,
   logs = [],
+  terrainTextureDefaults = {},
 }) {
   const baseMapList = Array.isArray(maps) && maps.length > 0
     ? maps.map((map) => normalizeMapShape(map)).filter(Boolean)
@@ -1437,6 +1380,7 @@ function createCampaign({
     maps: baseMapList,
     scene: normalizedScene,
     logs: Array.isArray(logs) ? logs : [],
+    terrainTextureDefaults: normalizeTextureDefaults(terrainTextureDefaults, activeTextureCatalog),
   };
 }
 
@@ -1452,6 +1396,7 @@ function normalizeCampaignShape(campaign) {
   campaign.updatedAt = campaign.updatedAt || nowIso();
   campaign.characters = Array.isArray(campaign.characters) ? campaign.characters : [];
   campaign.statblocks = Array.isArray(campaign.statblocks) ? campaign.statblocks : [];
+  normalizeCampaignTerrainDefaults(campaign, activeTextureCatalog);
   campaign.maps = (Array.isArray(campaign.maps) ? campaign.maps : [])
     .map((map) => normalizeMapShape(map))
     .filter(Boolean);
@@ -1512,6 +1457,7 @@ function migrateStateShape(rawState) {
         maps: legacyMaps.length > 0 ? legacyMaps : null,
         scene: legacyScene,
         logs: legacyLogs,
+        terrainTextureDefaults: {},
       }),
     ];
   }
@@ -1525,6 +1471,10 @@ function migrateStateShape(rawState) {
   state.meta = state.meta || {};
   state.meta.createdAt = state.meta.createdAt || nowIso();
   state.meta.updatedAt = state.meta.updatedAt || nowIso();
+  state.meta.terrainTextureDefaultsGlobal = normalizeTextureDefaults(
+    state.meta.terrainTextureDefaultsGlobal,
+    activeTextureCatalog
+  );
   return state;
 }
 
@@ -1605,23 +1555,11 @@ function sanitizedMapForRole(map, role) {
   if (!map) {
     return null;
   }
-  const cloned = deepClone(map);
+  const cloned = cloneVisibleMapForRole(map, role);
   if (role !== "dm") {
     cloned.tokens = cloned.tokens.filter((token) => token.layer !== "gm");
     cloned.drawings = (Array.isArray(cloned.drawings) ? cloned.drawings : []).filter(
       (drawing) => drawing.layer !== "gm"
-    );
-    cloned.terrain = cloned.terrain.map((row) =>
-      row.map((cell) => {
-        const safe = { ...cell };
-        if (safe.blockType === "door") {
-          delete safe.doorLocked;
-        }
-        if (safe.difficultType === "hidden") {
-          safe.difficultType = "none";
-        }
-        return safe;
-      })
     );
   }
   return cloned;
@@ -1677,6 +1615,7 @@ function sanitizeStatblockForClient(statblock, role) {
 }
 
 function createTabletopSystem(io, options = {}) {
+  activeTextureCatalog = buildTextureCatalog(options.textureLibraryRoot || DEFAULT_TERRAIN_TEXTURE_ROOT);
   const persistence = createPersistence(options.dataDirectory);
   const state = persistence.getState();
 
@@ -1869,6 +1808,20 @@ function createTabletopSystem(io, options = {}) {
         modifierCatalog: ROLL_MODIFIER_CATALOG,
         italicizedSkills: Array.from(ITALICIZED_SKILLS),
       },
+      terrain: {
+        campaignTextureDefaults:
+          campaign && campaign.terrainTextureDefaults ? campaign.terrainTextureDefaults : {},
+        globalTextureDefaults: state.meta && state.meta.terrainTextureDefaultsGlobal
+          ? state.meta.terrainTextureDefaultsGlobal
+          : {},
+        resolvedTextureDefaults: buildResolvedTextureDefaults(
+          activeTextureCatalog,
+          campaign && campaign.terrainTextureDefaults ? campaign.terrainTextureDefaults : {},
+          state.meta && state.meta.terrainTextureDefaultsGlobal
+            ? state.meta.terrainTextureDefaultsGlobal
+            : {}
+        ),
+      },
       scene: {
         activeMapId: map ? map.id : null,
         map: sanitizedMapForRole(map, role),
@@ -1905,6 +1858,10 @@ function createTabletopSystem(io, options = {}) {
 
   function emitSnapshot(socket) {
     socket.emit("tabletop:state", makeSnapshot(socket));
+  }
+
+  function emitTerrainCatalog(socket) {
+    socket.emit("terrain:catalog", serializeTextureCatalogForClient(activeTextureCatalog));
   }
 
   function broadcastSnapshots() {
@@ -2497,6 +2454,7 @@ function createTabletopSystem(io, options = {}) {
     socket.data.user = null;
     socket.data.campaignId = firstCampaign() ? firstCampaign().id : null;
 
+    emitTerrainCatalog(socket);
     emitSnapshot(socket);
 
     socket.on("auth:resume", (payload) => {
@@ -3062,22 +3020,14 @@ function createTabletopSystem(io, options = {}) {
       if (!map) {
         return;
       }
-      const imageDataUrl = String((payload && payload.imageDataUrl) || "");
-      if (!imageDataUrl) {
-        map.background.imageDataUrl = "";
-      } else {
-        const looksLikeDataImage = /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(imageDataUrl);
-        if (!looksLikeDataImage) {
-          socket.emit("tabletop:error", { message: "Background must be an image file." });
-          return;
-        }
-        if (imageDataUrl.length > MAX_MAP_BACKGROUND_DATA_URL_LENGTH) {
-          socket.emit("tabletop:error", { message: "Background image is too large." });
-          return;
-        }
-        map.background.imageDataUrl = imageDataUrl;
+      const backgroundLayer = map.terrainLayers.find((layer) => layer.type === "background") || null;
+      const result = importBackgroundIntoLayer(backgroundLayer, String((payload && payload.imageDataUrl) || ""));
+      if (!result.ok) {
+        socket.emit("tabletop:error", { message: result.reason || "Could not update background." });
+        return;
       }
       map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
       appendSystemLog(campaign, socket, `Updated background for ${map.name}.`);
       persistence.saveSoon();
       broadcastSnapshots();
@@ -3162,65 +3112,32 @@ function createTabletopSystem(io, options = {}) {
       broadcastSnapshots();
     });
 
-    socket.on("map:paintTerrain", (payload) => {
+    socket.on("terrain:setTextureDefault", (payload) => {
       if (!requireDm(socket)) {
         return;
       }
       const campaign = ensureSocketCampaign(socket);
-      const map = activeMapFromCampaign(campaign);
-      if (!map) {
+      if (!campaign) {
         return;
       }
-      const x = Number.parseInt(payload && payload.x, 10);
-      const y = Number.parseInt(payload && payload.y, 10);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      const categoryId = String((payload && payload.categoryId) || "").trim();
+      const textureId = String((payload && payload.textureId) || "").trim();
+      const asset = activeTextureCatalog.assetsById[textureId];
+      if (!categoryId || !asset || asset.categoryId !== categoryId) {
         return;
       }
-      const cell = getTerrainCell(map, x, y);
-      if (!cell) {
-        return;
+      campaign.terrainTextureDefaults = campaign.terrainTextureDefaults || {};
+      campaign.terrainTextureDefaults[categoryId] = textureId;
+      if (payload && payload.applyToAllCampaigns) {
+        state.meta.terrainTextureDefaultsGlobal = state.meta.terrainTextureDefaultsGlobal || {};
+        state.meta.terrainTextureDefaultsGlobal[categoryId] = textureId;
       }
-
-      const brush = String((payload && payload.brush) || "");
-      if (brush === "erase") {
-        Object.assign(cell, { ...DEFAULT_CELL });
-      } else if (["stone_wall", "wooden_wall", "window"].includes(brush)) {
-        cell.specialType = null;
-        cell.blockType = brush;
-        cell.doorOpen = false;
-        cell.doorLocked = false;
-      } else if (brush === "door_locked") {
-        cell.specialType = null;
-        cell.blockType = "door";
-        cell.doorLocked = true;
-        cell.doorOpen = false;
-      } else if (brush === "door_unlocked") {
-        cell.specialType = null;
-        cell.blockType = "door";
-        cell.doorLocked = false;
-        cell.doorOpen = false;
-      } else if (brush === "door_open") {
-        cell.specialType = null;
-        cell.blockType = "door";
-        cell.doorLocked = false;
-        cell.doorOpen = true;
-      } else if (brush === "difficult_visible") {
-        cell.specialType = null;
-        cell.difficultType = "visible";
-      } else if (brush === "difficult_hidden") {
-        cell.specialType = null;
-        cell.difficultType = "hidden";
-      } else if (brush === "difficult_clear") {
-        cell.specialType = null;
-        cell.difficultType = "none";
-      }
-
-      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
       persistence.saveSoon();
       broadcastSnapshots();
     });
 
-    socket.on("map:setDoorLock", (payload) => {
+    socket.on("terrain:layerCreate", (payload) => {
       if (!requireDm(socket)) {
         return;
       }
@@ -3229,17 +3146,117 @@ function createTabletopSystem(io, options = {}) {
       if (!map) {
         return;
       }
-      const x = Number.parseInt(payload && payload.x, 10);
-      const y = Number.parseInt(payload && payload.y, 10);
-      const cell = getTerrainCell(map, x, y);
-      if (!cell || cell.blockType !== "door") {
+      const layerType = payload && payload.type === "foreground" ? "foreground" : "background";
+      createLayerOnMap(map, layerType, createId, activeTextureCatalog);
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
+    socket.on("terrain:layerUpdate", (payload) => {
+      if (!requireDm(socket)) {
         return;
       }
-      cell.doorLocked = Boolean(payload && payload.locked);
-      if (cell.doorLocked) {
-        cell.doorOpen = false;
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map) {
+        return;
+      }
+      const layer = getTerrainLayerById(map, payload && payload.layerId);
+      if (!layer) {
+        return;
+      }
+      if (payload && payload.visible !== undefined) {
+        layer.visible = Boolean(payload.visible);
       }
       map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
+    socket.on("terrain:layerDelete", (payload) => {
+      if (!requireDm(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map) {
+        return;
+      }
+      const result = deleteLayerFromMap(map, payload && payload.layerId);
+      if (!result.ok) {
+        socket.emit("tabletop:error", { message: result.reason || "Could not delete layer." });
+        return;
+      }
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
+    socket.on("terrain:layerReorder", (payload) => {
+      if (!requireDm(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map) {
+        return;
+      }
+      const ok = reorderLayersOnMap(map, payload && payload.orderedLayerIds);
+      if (!ok) {
+        return;
+      }
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
+    socket.on("terrain:importBackground", (payload) => {
+      if (!requireDm(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map) {
+        return;
+      }
+      const layer = getTerrainLayerById(map, payload && payload.layerId);
+      const result = importBackgroundIntoLayer(layer, String((payload && payload.imageDataUrl) || ""));
+      if (!result.ok) {
+        socket.emit("tabletop:error", { message: result.reason || "Could not import background." });
+        return;
+      }
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
+    socket.on("terrain:applyOps", (payload) => {
+      if (!requireDm(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map) {
+        return;
+      }
+      const result = applyTerrainOps(
+        map,
+        payload && payload.layerId,
+        payload && payload.ops,
+        activeTextureCatalog
+      );
+      if (!result.ok) {
+        socket.emit("tabletop:error", { message: result.reason || "Could not apply terrain edits." });
+        return;
+      }
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
       persistence.saveSoon();
       broadcastSnapshots();
     });
@@ -3255,25 +3272,28 @@ function createTabletopSystem(io, options = {}) {
       }
       const x = Number.parseInt(payload && payload.x, 10);
       const y = Number.parseInt(payload && payload.y, 10);
-      const cell = getTerrainCell(map, x, y);
-      if (!cell || cell.blockType !== "door") {
+      const door = findDoorComponentAt(map, x, y);
+      if (!door) {
         return;
       }
-      if (roleForUserInCampaign(socket.data.user, campaign) !== "dm" && cell.doorLocked) {
+      const role = roleForUserInCampaign(socket.data.user, campaign);
+      if (door.tile.doorLocked && role !== "dm") {
         socket.emit("tabletop:error", { message: "That door is locked." });
+        socket.emit("terrain:doorInteractionResult", { x, y, locked: true });
         return;
       }
-      if (roleForUserInCampaign(socket.data.user, campaign) === "dm" && payload && payload.forceState) {
+      if (role === "dm" && payload && payload.forceState) {
         if (payload.forceState === "open") {
-          cell.doorOpen = true;
+          door.tile.doorOpen = true;
         }
         if (payload.forceState === "closed") {
-          cell.doorOpen = false;
+          door.tile.doorOpen = false;
         }
-      } else if (!cell.doorLocked) {
-        cell.doorOpen = !cell.doorOpen;
+      } else if (!door.tile.doorLocked) {
+        door.tile.doorOpen = !door.tile.doorOpen;
       }
       map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
       persistence.saveSoon();
       broadcastSnapshots();
     });
@@ -3440,7 +3460,7 @@ function createTabletopSystem(io, options = {}) {
       }
 
       const targetCell = getTerrainCell(map, targetX, targetY);
-      if (isCellBlockingMovement(targetCell)) {
+      if (isTileBlockingMovement(targetCell)) {
         socket.emit("tabletop:error", { message: "That tile blocks movement." });
         return;
       }
@@ -4020,7 +4040,7 @@ function createTabletopSystem(io, options = {}) {
           const nx = token.x + direction.dx;
           const ny = token.y + direction.dy;
           const cell = getTerrainCell(map, nx, ny);
-          if (!cell || isCellBlockingMovement(cell)) {
+          if (isTileBlockingMovement(cell)) {
             return;
           }
           candidates.push({ x: nx, y: ny });

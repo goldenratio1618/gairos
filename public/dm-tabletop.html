@@ -34,8 +34,8 @@
           id="rail-battlemaps"
           type="button"
           class="tt-rail-button tt-hidden"
-          title="Battlemaps"
-          data-tooltip="Battlemaps"
+          title="Terrain"
+          data-tooltip="Terrain"
         >
           <img src="/tabletop-icons/battlemaps.svg" alt="" />
         </button>
@@ -139,7 +139,7 @@
         </section>
 
         <section class="tt-card tt-hidden tt-panel" id="map-card" data-menu-panel="battlemaps">
-          <h2>Battlemaps (DM)</h2>
+          <h2>Terrain (DM)</h2>
           <div class="tt-grid3 tt-inline-controls">
             <select id="map-select"></select>
             <button id="map-new" type="button" class="tt-icon-button" title="New Map">+</button>
@@ -170,8 +170,28 @@
               <span id="map-gm-opacity-value">55%</span>
             </div>
           </div>
-          <label class="tt-file-label" for="map-background-input">Background Image</label>
-          <input id="map-background-input" type="file" accept="image/*" />
+
+          <div class="tt-terrain-stack">
+            <div class="tt-terrain-section">
+              <div class="tt-mapctrl-label">Layers</div>
+              <div id="terrain-active-layer" class="tt-inline-value">No layer selected</div>
+              <div id="terrain-layer-list" class="tt-list tt-terrain-layer-list"></div>
+              <div class="tt-grid2">
+                <select id="terrain-layer-new-type">
+                  <option value="background">Background Layer</option>
+                  <option value="foreground">Foreground Layer</option>
+                </select>
+                <button id="terrain-layer-new" type="button">Create Layer</button>
+              </div>
+            </div>
+
+            <div class="tt-terrain-section">
+              <div class="tt-mapctrl-label">Background Import</div>
+              <div class="tt-log-meta">Replaces the selected background layer.</div>
+              <label class="tt-file-label" for="map-background-input">Import Background Image</label>
+              <input id="map-background-input" type="file" accept="image/*" />
+            </div>
+          </div>
 
           <div class="tt-mapctrl">
             <div class="tt-mapctrl-label">Mode</div>
@@ -182,24 +202,74 @@
             </div>
           </div>
 
-          <div class="tt-mapctrl" id="brush-panel">
-            <div class="tt-mapctrl-label">Brush</div>
-            <div class="tt-brush-palette" id="brush-group">
-              <button type="button" class="tt-brush tt-brush-erase tt-seg-active" data-value="erase" title="Erase terrain">✕</button>
-              <button type="button" class="tt-brush tt-brush-stone" data-value="stone_wall" title="Stone Wall"></button>
-              <button type="button" class="tt-brush tt-brush-wood" data-value="wooden_wall" title="Wooden Wall"></button>
-              <button type="button" class="tt-brush tt-brush-window" data-value="window" title="Window"></button>
-              <button type="button" class="tt-brush tt-brush-door-locked" data-value="door_locked" title="Door (Locked)"></button>
-              <button type="button" class="tt-brush tt-brush-door-unlocked" data-value="door_unlocked" title="Door (Unlocked)"></button>
-              <button type="button" class="tt-brush tt-brush-door-open" data-value="door_open" title="Door (Open)"></button>
-              <button type="button" class="tt-brush tt-brush-difficult" data-value="difficult_visible" title="Difficult (Visible)"></button>
-              <button type="button" class="tt-brush tt-brush-difficult-hid" data-value="difficult_hidden" title="Difficult (Hidden)"></button>
-              <button type="button" class="tt-brush tt-brush-clear-diff" data-value="difficult_clear" title="Clear Difficult">✓</button>
+          <div class="tt-mapctrl">
+            <div class="tt-mapctrl-label">Tool</div>
+            <div class="tt-seg-group tt-seg-wrap" id="terrain-tool-group">
+              <button type="button" class="tt-seg tt-seg-active" data-value="brush">Brush</button>
+              <button type="button" class="tt-seg" data-value="eraser">Eraser</button>
+              <button type="button" class="tt-seg" data-value="bucket">Bucket</button>
+              <button type="button" class="tt-seg" data-value="line">Line</button>
+              <button type="button" class="tt-seg" data-value="rectangle">Rect</button>
+              <button type="button" class="tt-seg" data-value="ellipse">Ellipse</button>
+              <button type="button" class="tt-seg" data-value="door">Door</button>
             </div>
           </div>
 
+          <div class="tt-grid2 tt-terrain-option-grid">
+            <div>
+              <label class="tt-field" for="terrain-brush-size">Brush Size</label>
+              <input id="terrain-brush-size" type="number" min="1" max="24" value="1" />
+            </div>
+            <div>
+              <label class="tt-field" for="terrain-opacity">Transparency</label>
+              <div class="tt-slider-row">
+                <input id="terrain-opacity" type="range" min="0.05" max="1" step="0.05" value="1" />
+                <span id="terrain-opacity-value">100%</span>
+              </div>
+            </div>
+            <div>
+              <label class="tt-field" for="terrain-line-width">Line Width</label>
+              <input id="terrain-line-width" type="number" min="1" max="24" value="1" />
+            </div>
+            <div>
+              <label class="tt-checkline">
+                <input id="terrain-shape-filled" type="checkbox" checked />
+                Fill Shapes
+              </label>
+            </div>
+          </div>
+
+          <div id="terrain-foreground-options" class="tt-grid3 tt-terrain-foreground-options">
+            <label class="tt-checkline">
+              <input id="terrain-block-movement" type="checkbox" checked />
+              Block movement
+            </label>
+            <label class="tt-checkline">
+              <input id="terrain-block-vision" type="checkbox" checked />
+              Block vision
+            </label>
+            <label class="tt-checkline">
+              <input id="terrain-block-light" type="checkbox" checked />
+              Block light
+            </label>
+          </div>
+
+          <div id="terrain-door-options" class="tt-row tt-hidden">
+            <label for="terrain-door-state">Door State</label>
+            <select id="terrain-door-state">
+              <option value="locked">Locked</option>
+              <option value="closed">Unlocked Closed</option>
+              <option value="open">Unlocked Open</option>
+            </select>
+          </div>
+
+          <div class="tt-mapctrl" id="brush-panel">
+            <div class="tt-mapctrl-label">Textures</div>
+            <div class="tt-brush-palette tt-terrain-palette" id="brush-group"></div>
+          </div>
+
           <div class="tt-mapctrl">
-            <div class="tt-mapctrl-label">Layer</div>
+            <div class="tt-mapctrl-label">Token Layer</div>
             <div class="tt-seg-group" id="layer-group">
               <button type="button" class="tt-seg tt-seg-active" data-value="tokens" title="Place on tokens layer">Tokens</button>
               <button type="button" class="tt-seg" data-value="gm" title="GM hidden layer">GM</button>
@@ -384,6 +454,33 @@
           <button type="submit">Send</button>
         </form>
       </aside>
+    </div>
+
+    <div id="terrain-category-modal" class="tt-modal tt-hidden">
+      <div class="tt-modal-backdrop" data-close-modal="terrain-category-modal"></div>
+      <div class="tt-modal-card">
+        <div class="tt-modal-header">
+          <h2 id="terrain-category-title">Choose Texture</h2>
+          <button id="terrain-category-close" type="button" class="tt-icon-button">×</button>
+        </div>
+        <label class="tt-checkline">
+          <input id="terrain-category-apply-global" type="checkbox" />
+          Apply default to all campaigns
+        </label>
+        <div id="terrain-category-grid" class="tt-terrain-modal-grid"></div>
+      </div>
+    </div>
+
+    <div id="terrain-color-modal" class="tt-modal tt-hidden">
+      <div class="tt-modal-backdrop" data-close-modal="terrain-color-modal"></div>
+      <div class="tt-modal-card tt-modal-card-small">
+        <div class="tt-modal-header">
+          <h2>Uniform Color</h2>
+          <button id="terrain-color-close" type="button" class="tt-icon-button">×</button>
+        </div>
+        <input id="terrain-color-input" type="color" value="#7f8c4a" />
+        <button id="terrain-color-confirm" type="button">Use Color</button>
+      </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

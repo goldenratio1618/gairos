@@ -314,12 +314,17 @@ body {
 /* Terrain layer – purely visual, no pointer events */
 .tt-terrain-layer {
   pointer-events: none !important;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
-.tt-terrain-cell {
-  width: 40px;
-  height: 40px;
-  position: relative;
+.tt-terrain-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .tt-cell {
@@ -416,6 +421,10 @@ body {
   gap: 8px;
 }
 
+.tt-seg-wrap {
+  flex-wrap: wrap;
+}
+
 .tt-mapctrl-label {
   font-size: 0.68rem;
   color: var(--muted);
@@ -473,6 +482,10 @@ body {
   grid-template-columns: repeat(5, 1fr);
   gap: 4px;
   flex: 1;
+}
+
+.tt-terrain-palette {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .tt-brush {
@@ -588,6 +601,215 @@ body {
   background: rgba(7, 10, 9, 0.7);
   color: var(--ok);
   font-size: 0.85rem;
+}
+
+.tt-terrain-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.tt-terrain-section {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(4, 8, 7, 0.45);
+  display: grid;
+  gap: 8px;
+}
+
+.tt-terrain-option-grid {
+  align-items: end;
+}
+
+.tt-terrain-foreground-options {
+  align-items: center;
+}
+
+.tt-terrain-layer-list {
+  max-height: 240px;
+}
+
+.tt-terrain-layer-item {
+  display: grid;
+  gap: 6px;
+}
+
+.tt-terrain-layer-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tt-terrain-layer-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  cursor: pointer;
+}
+
+.tt-terrain-layer-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.tt-terrain-layer-dot[data-type="background"] {
+  background: #86a67c;
+}
+
+.tt-terrain-layer-dot[data-type="foreground"] {
+  background: #b8893e;
+}
+
+.tt-terrain-layer-item.is-active {
+  border-color: rgba(217, 164, 65, 0.8);
+  box-shadow: 0 0 0 1px rgba(217, 164, 65, 0.25);
+}
+
+.tt-terrain-layer-item.is-hidden {
+  opacity: 0.55;
+}
+
+.tt-terrain-layer-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tt-terrain-layer-actions button {
+  min-width: 34px;
+}
+
+.tt-texture-card {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(7, 10, 9, 0.55);
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  min-height: 92px;
+}
+
+.tt-texture-card.is-active {
+  border-color: rgba(217, 164, 65, 0.9);
+  box-shadow: 0 0 0 1px rgba(217, 164, 65, 0.45);
+}
+
+.tt-texture-preview {
+  width: 100%;
+  aspect-ratio: 1;
+  display: block;
+  object-fit: cover;
+  background: rgba(10, 14, 13, 0.9);
+}
+
+.tt-texture-preview.tt-texture-color {
+  background-image:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+}
+
+.tt-texture-label {
+  padding: 6px 8px;
+  font-size: 0.7rem;
+  color: var(--text);
+  text-align: left;
+}
+
+.tt-texture-more {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f7efe1;
+}
+
+.tt-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.tt-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.tt-modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(780px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  margin: 24px auto;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(9, 12, 11, 0.96);
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.55);
+}
+
+.tt-modal-card-small {
+  width: min(320px, calc(100vw - 32px));
+}
+
+.tt-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tt-modal-header h2 {
+  margin: 0;
+}
+
+.tt-terrain-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 8px;
+}
+
+.tt-modal-card button:not(.tt-texture-card) {
+  border: none;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  background: linear-gradient(145deg, #b8893e, #996d28);
+  color: #f7efe1;
+  cursor: pointer;
+}
+
+.tt-modal-card button:not(.tt-texture-card):hover {
+  filter: brightness(1.08);
+}
+
+.tt-modal-card input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(7, 10, 9, 0.65);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 0.86rem;
 }
 
 /* ─── Token select box ─── */
