@@ -5,6 +5,12 @@
   const STORAGE_LOG_MIN_KEY = "gairos_tabletop_log_minimized";
   const STORAGE_LEFT_MIN_KEY = "gairos_tabletop_left_minimized";
   const MAX_MAP_BACKGROUND_DATA_URL_LENGTH = 9_500_000;
+  const DEFAULT_LIGHTING_MODE = "visible";
+  const DEFAULT_DIM_LIGHT_ALPHA = 0.34;
+  const DEFAULT_DARKVISION_TINT = "#6f89b8";
+  const DEFAULT_DARKVISION_TINT_ALPHA = 0.42;
+  const DEFAULT_TOKEN_AURA_COLOR = "#59a8ff";
+  const MAX_LIGHT_RADIUS_FEET = 10_000;
 
   const elements = {
     root: document.getElementById("tabletop-root"),
@@ -25,7 +31,9 @@
     railAccount: document.getElementById("rail-account"),
     railCampaigns: document.getElementById("rail-campaigns"),
     railCharacter: document.getElementById("rail-character"),
-    railBattlemaps: document.getElementById("rail-battlemaps"),
+    railTokens: document.getElementById("rail-tokens"),
+    railTerrain: document.getElementById("rail-terrain"),
+    railLighting: document.getElementById("rail-lighting"),
     railRolls: document.getElementById("rail-rolls"),
     railCombat: document.getElementById("rail-combat"),
     railUtilities: document.getElementById("rail-utilities"),
@@ -82,7 +90,6 @@
     mapGmOpacity: document.getElementById("map-gm-opacity"),
     mapGmOpacityValue: document.getElementById("map-gm-opacity-value"),
     mapBackgroundInput: document.getElementById("map-background-input"),
-    modeGroup: document.getElementById("mode-group"),
     terrainToolGroup: document.getElementById("terrain-tool-group"),
     terrainActiveLayer: document.getElementById("terrain-active-layer"),
     terrainLayerList: document.getElementById("terrain-layer-list"),
@@ -101,15 +108,38 @@
     terrainDoorState: document.getElementById("terrain-door-state"),
     brushGroup: document.getElementById("brush-group"),
     brushPanel: document.getElementById("brush-panel"),
+
+    tokenCard: document.getElementById("token-card"),
+    tokenActiveMap: document.getElementById("token-active-map"),
+    tokenPlayerList: document.getElementById("token-player-list"),
     layerGroup: document.getElementById("layer-group"),
     customTokenFile: document.getElementById("custom-token-file"),
     tokenRoster: document.getElementById("token-roster"),
-
+    tokenInfoInline: document.getElementById("token-info-inline"),
     selectedTokenControls: document.getElementById("selected-token-controls"),
     tokenLayerToTokens: document.getElementById("token-layer-to-tokens"),
     tokenLayerToGm: document.getElementById("token-layer-to-gm"),
     tokenToggleAuto: document.getElementById("token-toggle-auto"),
     tokenDelete: document.getElementById("token-delete"),
+
+    lightingCard: document.getElementById("lighting-card"),
+    lightingActiveMap: document.getElementById("lighting-active-map"),
+    lightingMode: document.getElementById("lighting-mode"),
+    lightingDimAmount: document.getElementById("lighting-dim-amount"),
+    lightingDimAmountValue: document.getElementById("lighting-dim-amount-value"),
+    lightingDarkvisionTint: document.getElementById("lighting-darkvision-tint"),
+    lightingDarkvisionStrength: document.getElementById("lighting-darkvision-strength"),
+    lightingDarkvisionStrengthValue: document.getElementById("lighting-darkvision-strength-value"),
+    lightingSourceId: document.getElementById("lighting-source-id"),
+    lightingSourceName: document.getElementById("lighting-source-name"),
+    lightingSourceBright: document.getElementById("lighting-source-bright"),
+    lightingSourceDim: document.getElementById("lighting-source-dim"),
+    lightingSourceColor: document.getElementById("lighting-source-color"),
+    lightingSourceArm: document.getElementById("lighting-source-arm"),
+    lightingSourceSave: document.getElementById("lighting-source-save"),
+    lightingSourceClear: document.getElementById("lighting-source-clear"),
+    lightingSourceDelete: document.getElementById("lighting-source-delete"),
+    lightingSourceList: document.getElementById("lighting-source-list"),
 
     rollCard: document.getElementById("roll-card"),
     rollForm: document.getElementById("roll-form"),
@@ -163,6 +193,8 @@
     mapGridWrap: document.getElementById("map-grid-wrap"),
     mapGridCells: document.getElementById("map-grid-cells"),
     mapTerrainLayer: document.getElementById("map-terrain-layer"),
+    mapLightingLayer: document.getElementById("map-lighting-layer"),
+    mapVisionLayer: document.getElementById("map-vision-layer"),
     mapGridTokens: document.getElementById("map-grid-tokens"),
     mapMeasureOverlay: document.getElementById("map-measure-overlay"),
     mapDrawingsLayer: document.getElementById("map-drawings-layer"),
@@ -179,6 +211,21 @@
     terrainColorInput: document.getElementById("terrain-color-input"),
     terrainColorConfirm: document.getElementById("terrain-color-confirm"),
     terrainColorClose: document.getElementById("terrain-color-close"),
+
+    tokenInfoModal: document.getElementById("token-info-modal"),
+    tokenInfoTitle: document.getElementById("token-info-title"),
+    tokenInfoGrid: document.getElementById("token-info-grid"),
+    tokenInfoClose: document.getElementById("token-info-close"),
+    tokenConfigModal: document.getElementById("token-config-modal"),
+    tokenConfigTitle: document.getElementById("token-config-title"),
+    tokenConfigTokenId: document.getElementById("token-config-token-id"),
+    tokenConfigBright: document.getElementById("token-config-bright"),
+    tokenConfigDim: document.getElementById("token-config-dim"),
+    tokenConfigDarkvision: document.getElementById("token-config-darkvision"),
+    tokenConfigAuraRadius: document.getElementById("token-config-aura-radius"),
+    tokenConfigAuraColor: document.getElementById("token-config-aura-color"),
+    tokenConfigSave: document.getElementById("token-config-save"),
+    tokenConfigClose: document.getElementById("token-config-close"),
 
     logPanel: document.getElementById("log-panel"),
     logToggle: document.getElementById("log-toggle"),
@@ -204,7 +251,6 @@
     characterAutoSaveTimer: null,
     mapAutoSaveTimer: null,
     terrainCatalog: null,
-    interactionMode: "move",
     tokenLayer: "tokens",
     paintDrag: {
       active: false,
@@ -269,6 +315,16 @@
       textureImages: new Map(),
       textureTileCache: new Map(),
       lockFlash: null,
+    },
+    lightingUi: {
+      selectedSourceId: null,
+      pendingPlacement: null,
+      tokenInfoTokenId: null,
+      tokenConfigTokenId: null,
+      blockerCacheKey: "",
+      blockerCache: null,
+      visibilityCacheKey: "",
+      visibilityCache: null,
     },
   };
 
@@ -410,33 +466,49 @@
     });
   }
 
+  function isMapToolMenu(menuKey) {
+    return ["terrain", "tokens", "lighting"].includes(menuKey);
+  }
+
   function activeInteractionMode() {
-    if (!isDm()) {
-      return "move";
+    if (state.activeMenu === "terrain" && isDm()) {
+      return "paint";
     }
-    return state.interactionMode || "move";
+    if (state.activeMenu === "lighting" && isDm()) {
+      return "lighting";
+    }
+    if (state.activeMenu === "tokens") {
+      return state.selectedPlacement ? "place" : "move";
+    }
+    return "idle";
   }
 
   function isPaintModeActive() {
-    return isDm() && state.interactionMode === "paint";
+    return activeInteractionMode() === "paint";
   }
 
   function isPlaceModeActive() {
-    return isDm() && state.interactionMode === "place";
+    return activeInteractionMode() === "place";
+  }
+
+  function isLightingModeActive() {
+    return activeInteractionMode() === "lighting";
   }
 
   function setInteractionMode(mode) {
-    const normalized = ["move", "paint", "place"].includes(mode) ? mode : "move";
-    state.interactionMode = normalized;
-    if (elements.modeGroup) {
-      elements.modeGroup.querySelectorAll(".tt-seg").forEach((btn) => {
-        btn.classList.toggle("tt-seg-active", btn.dataset.value === normalized);
-      });
+    if (mode === "paint") {
+      setActiveMenu("terrain");
+      return;
     }
-    if (normalized !== "paint") {
+    if (mode === "lighting") {
+      setActiveMenu("lighting");
+      return;
+    }
+    setActiveMenu("tokens");
+    if (mode !== "paint") {
       stopPaintDrag();
     }
-    if (normalized !== "place") {
+    if (mode !== "place") {
       state.selectedPlacement = null;
       renderTokenRoster();
     }
@@ -459,6 +531,36 @@
       return value;
     }
     return 5;
+  }
+
+  function clampLightRadiusFeet(value) {
+    return clamp(Number.parseFloat(value) || 0, 0, MAX_LIGHT_RADIUS_FEET);
+  }
+
+  function normalizeTokenVisionConfig(vision) {
+    const next = vision && typeof vision === "object" ? vision : {};
+    return {
+      brightRadius: clampLightRadiusFeet(next.brightRadius),
+      dimRadius: clampLightRadiusFeet(next.dimRadius),
+      darkvisionRadius: clampLightRadiusFeet(next.darkvisionRadius),
+      auraRadius: clampLightRadiusFeet(next.auraRadius),
+      auraColor: normalizeTerrainColor(next.auraColor || DEFAULT_TOKEN_AURA_COLOR),
+    };
+  }
+
+  function lightingSettings(map = activeMap()) {
+    const lighting = map && map.lighting && typeof map.lighting === "object" ? map.lighting : {};
+    return {
+      mode: ["visible", "hidden", "dynamic"].includes(lighting.mode) ? lighting.mode : DEFAULT_LIGHTING_MODE,
+      dimAlpha: clamp(Number(lighting.dimAlpha) || DEFAULT_DIM_LIGHT_ALPHA, 0, 0.95),
+      darkvisionTint: normalizeTerrainColor(lighting.darkvisionTint || DEFAULT_DARKVISION_TINT),
+      darkvisionAlpha: clamp(Number(lighting.darkvisionAlpha) || DEFAULT_DARKVISION_TINT_ALPHA, 0, 0.95),
+      sources: Array.isArray(lighting.sources) ? lighting.sources : [],
+    };
+  }
+
+  function lightingSources(map = activeMap()) {
+    return lightingSettings(map).sources;
   }
 
   async function normalizeMapBackgroundDataUrl(file) {
@@ -700,8 +802,13 @@
       if (layer.type !== "foreground") {
         return null;
       }
+      const textureId =
+        state.terrain.brush.kind === "texture"
+          ? String(state.terrain.brush.textureId || "")
+          : "";
       return {
         kind: "door",
+        textureId,
         alpha: opacity,
         blocksMovement: true,
         blocksVision: Boolean(state.terrain.foregroundRules.blocksVision),
@@ -1119,7 +1226,7 @@
   }
 
   function beginDragSelect(event) {
-    if (!activeMap() || isPaintModeActive() || isPlaceModeActive()) {
+    if (!activeMap() || state.activeMenu !== "tokens" || isPaintModeActive() || isPlaceModeActive()) {
       return;
     }
     state.dragSelect.active = true;
@@ -1871,6 +1978,21 @@
     elements.mapGmOpacityValue.textContent = `${Math.round(opacity * 100)}%`;
   }
 
+  function updateLightingLabels() {
+    if (elements.lightingDimAmount && elements.lightingDimAmountValue) {
+      const dim = clamp(Number(elements.lightingDimAmount.value) || DEFAULT_DIM_LIGHT_ALPHA, 0, 0.95);
+      elements.lightingDimAmountValue.textContent = `${Math.round(dim * 100)}%`;
+    }
+    if (elements.lightingDarkvisionStrength && elements.lightingDarkvisionStrengthValue) {
+      const tint = clamp(
+        Number(elements.lightingDarkvisionStrength.value) || DEFAULT_DARKVISION_TINT_ALPHA,
+        0,
+        0.95
+      );
+      elements.lightingDarkvisionStrengthValue.textContent = `${Math.round(tint * 100)}%`;
+    }
+  }
+
   function saveMapNow({ includeName = false } = {}) {
     if (!isDm()) {
       return;
@@ -1883,6 +2005,22 @@
     const cols = clamp(Number.parseInt(elements.mapCols && elements.mapCols.value, 10) || map.cols || 30, 5, 80);
     const feetPerCell = clamp(Number.parseFloat(elements.mapGridFeet && elements.mapGridFeet.value) || feetPerSquare(map), 1, 200);
     const gmTokenOpacity = clamp(Number.parseFloat(elements.mapGmOpacity && elements.mapGmOpacity.value) || 0.55, 0.1, 1);
+    const lightingMode = (elements.lightingMode && elements.lightingMode.value) || lightingSettings(map).mode;
+    const dimLightAlpha = clamp(
+      Number.parseFloat((elements.lightingDimAmount && elements.lightingDimAmount.value) || lightingSettings(map).dimAlpha),
+      0,
+      0.95
+    );
+    const darkvisionTint =
+      (elements.lightingDarkvisionTint && elements.lightingDarkvisionTint.value) || lightingSettings(map).darkvisionTint;
+    const darkvisionTintAlpha = clamp(
+      Number.parseFloat(
+        (elements.lightingDarkvisionStrength && elements.lightingDarkvisionStrength.value) ||
+          lightingSettings(map).darkvisionAlpha
+      ),
+      0,
+      0.95
+    );
     if (elements.mapRows) {
       elements.mapRows.value = String(rows);
     }
@@ -1903,6 +2041,10 @@
       cols,
       feetPerCell,
       gmTokenOpacity,
+      lightingMode,
+      dimLightAlpha,
+      darkvisionTint,
+      darkvisionTintAlpha,
     };
 
     if (includeName && elements.mapName) {
@@ -2179,7 +2321,7 @@
 
   function setLeftPanelCollapsed(collapsed, persist = true) {
     state.leftPanelCollapsed = Boolean(collapsed);
-    if (state.leftPanelCollapsed && state.activeMenu === "battlemaps") {
+    if (state.leftPanelCollapsed && isMapToolMenu(state.activeMenu)) {
       resetMapInteractionMode();
     }
     if (persist) {
@@ -2192,8 +2334,9 @@
   }
 
   function resetMapInteractionMode() {
-    setInteractionMode("move");
+    stopPaintDrag();
     state.selectedPlacement = null;
+    state.lightingUi.pendingPlacement = null;
     renderTokenRoster();
   }
 
@@ -2222,7 +2365,9 @@
       { panel: "account", button: elements.railAccount },
       { panel: "campaigns", button: elements.railCampaigns },
       { panel: "character", button: elements.railCharacter },
-      { panel: "battlemaps", button: elements.railBattlemaps },
+      { panel: "tokens", button: elements.railTokens },
+      { panel: "terrain", button: elements.railTerrain },
+      { panel: "lighting", button: elements.railLighting },
       { panel: "rolls", button: elements.railRolls },
       { panel: "combat", button: elements.railCombat },
       { panel: "utilities", button: elements.railUtilities },
@@ -2248,7 +2393,7 @@
   function setActiveMenu(menuKey) {
     const previousPanel = state.activeMenu;
     state.activeMenu = menuKey;
-    if (previousPanel === "battlemaps" && menuKey !== "battlemaps") {
+    if (isMapToolMenu(previousPanel) && menuKey !== previousPanel && !isMapToolMenu(menuKey)) {
       resetMapInteractionMode();
     }
     applyMenuVisibility();
@@ -2256,13 +2401,13 @@
 
   function applyMenuVisibility() {
     let panel = state.activeMenu || "character";
-    if (panel === "battlemaps" && !isDm()) {
+    if ((panel === "terrain" || panel === "lighting") && !isDm()) {
       resetMapInteractionMode();
-      panel = "character";
+      panel = isAuthenticated() ? "tokens" : "account";
       state.activeMenu = panel;
     }
     if (!isAuthenticated() && panel !== "account") {
-      if (panel === "battlemaps") {
+      if (isMapToolMenu(panel)) {
         resetMapInteractionMode();
       }
       panel = "account";
@@ -2282,8 +2427,11 @@
       if (!entry.button) {
         return;
       }
-      if (entry.panel === "battlemaps") {
+      if (entry.panel === "terrain" || entry.panel === "lighting") {
         entry.button.classList.toggle("tt-hidden", !isDm());
+      }
+      if (entry.panel === "tokens") {
+        entry.button.classList.toggle("tt-hidden", !isAuthenticated());
       }
       entry.button.classList.toggle("active", panel === entry.panel);
     });
@@ -2782,6 +2930,243 @@
     renderTerrainCategoryModal();
   }
 
+  function activeMapSummaryText(map = activeMap()) {
+    return map ? `${map.name} (${map.cols}x${map.rows})` : "No map selected";
+  }
+
+  function selectedLightingSource() {
+    const sourceId = String(state.lightingUi.selectedSourceId || "");
+    if (!sourceId) {
+      return null;
+    }
+    return lightingSources().find((source) => source.id === sourceId) || null;
+  }
+
+  function clearLightingSourceSelection({ clearPlacement = true } = {}) {
+    state.lightingUi.selectedSourceId = null;
+    if (clearPlacement) {
+      state.lightingUi.pendingPlacement = null;
+    }
+    if (elements.lightingSourceId) {
+      elements.lightingSourceId.value = "";
+    }
+    if (elements.lightingSourceName) {
+      elements.lightingSourceName.value = "";
+    }
+    if (elements.lightingSourceBright) {
+      elements.lightingSourceBright.value = "20";
+    }
+    if (elements.lightingSourceDim) {
+      elements.lightingSourceDim.value = "20";
+    }
+    if (elements.lightingSourceColor) {
+      elements.lightingSourceColor.value = "#f5c56c";
+    }
+  }
+
+  function fillLightingSourceForm(source) {
+    if (!source) {
+      clearLightingSourceSelection();
+      return;
+    }
+    state.lightingUi.selectedSourceId = source.id;
+    if (elements.lightingSourceId) {
+      elements.lightingSourceId.value = source.id;
+    }
+    if (elements.lightingSourceName && document.activeElement !== elements.lightingSourceName) {
+      elements.lightingSourceName.value = source.name || "";
+    }
+    if (elements.lightingSourceBright && document.activeElement !== elements.lightingSourceBright) {
+      elements.lightingSourceBright.value = String(Number(source.brightRadius) || 0);
+    }
+    if (elements.lightingSourceDim && document.activeElement !== elements.lightingSourceDim) {
+      elements.lightingSourceDim.value = String(Number(source.dimRadius) || 0);
+    }
+    if (elements.lightingSourceColor && document.activeElement !== elements.lightingSourceColor) {
+      elements.lightingSourceColor.value = normalizeTerrainColor(source.color || "#f5c56c");
+    }
+  }
+
+  function lightingSourceFormPayload() {
+    return {
+      name: String((elements.lightingSourceName && elements.lightingSourceName.value) || "Light Source").trim() || "Light Source",
+      brightRadius: clampLightRadiusFeet(elements.lightingSourceBright && elements.lightingSourceBright.value),
+      dimRadius: clampLightRadiusFeet(elements.lightingSourceDim && elements.lightingSourceDim.value),
+      color: normalizeTerrainColor(
+        (elements.lightingSourceColor && elements.lightingSourceColor.value) || "#f5c56c"
+      ),
+    };
+  }
+
+  function renderConnectedPlayerList() {
+    if (!elements.tokenPlayerList) {
+      return;
+    }
+    elements.tokenPlayerList.innerHTML = "";
+    if (!isDm()) {
+      return;
+    }
+    const players = connectedUsers().filter((entry) => entry && entry.role === "player");
+    if (players.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "tt-inline-value";
+      empty.textContent = "No players currently joined.";
+      elements.tokenPlayerList.appendChild(empty);
+      return;
+    }
+    players.forEach((player) => {
+      const row = document.createElement("div");
+      row.className = "tt-list-item";
+      const ownedCharacters = characters().filter((character) => character.ownerUserId === player.id);
+      const characterNames = ownedCharacters.map((character) => character.name).join(", ");
+      const wrapper = document.createElement("div");
+      const name = document.createElement("div");
+      name.textContent = player.username;
+      wrapper.appendChild(name);
+      const detail = document.createElement("div");
+      detail.className = "tt-log-meta";
+      detail.textContent = characterNames || "No character tokens yet.";
+      wrapper.appendChild(detail);
+      row.appendChild(wrapper);
+      elements.tokenPlayerList.appendChild(row);
+    });
+  }
+
+  function renderLightingSourceList() {
+    if (!elements.lightingSourceList) {
+      return;
+    }
+    elements.lightingSourceList.innerHTML = "";
+    const sources = lightingSources();
+    if (sources.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "tt-inline-value";
+      empty.textContent = "No light sources on this map.";
+      elements.lightingSourceList.appendChild(empty);
+      return;
+    }
+    sources.forEach((source) => {
+      const item = document.createElement("div");
+      item.className = "tt-list-item";
+      if (source.id === state.lightingUi.selectedSourceId) {
+        item.style.borderColor = "#d9a441";
+      }
+
+      const label = document.createElement("div");
+      const name = document.createElement("div");
+      name.textContent = source.name;
+      label.appendChild(name);
+      const detail = document.createElement("div");
+      detail.className = "tt-log-meta";
+      detail.textContent =
+        `(${source.x + 1}, ${source.y + 1}) • ${Number(source.brightRadius) || 0} ft bright • ` +
+        `${Number(source.dimRadius) || 0} ft dim`;
+      label.appendChild(detail);
+      item.appendChild(label);
+
+      const controls = document.createElement("div");
+      controls.className = "tt-grid2";
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.textContent = "Edit";
+      editButton.addEventListener("click", () => {
+        fillLightingSourceForm(source);
+        renderLightingEditor();
+        renderMapGrid();
+      });
+      controls.appendChild(editButton);
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.textContent = "Delete";
+      deleteButton.className = "tt-danger";
+      deleteButton.addEventListener("click", () => {
+        emit("lighting:sourceDelete", { sourceId: source.id });
+        if (state.lightingUi.selectedSourceId === source.id) {
+          clearLightingSourceSelection();
+        }
+      });
+      controls.appendChild(deleteButton);
+
+      item.appendChild(controls);
+      elements.lightingSourceList.appendChild(item);
+    });
+  }
+
+  function renderInlineTokenInfo() {
+    if (!elements.tokenInfoInline) {
+      return;
+    }
+    const token = getTokenById(state.lightingUi.tokenInfoTokenId);
+    if (!token || !canCurrentUserInspectToken(token)) {
+      elements.tokenInfoInline.innerHTML = "";
+      return;
+    }
+    renderStatGrid(elements.tokenInfoInline, tokenInfoPairs(token));
+  }
+
+  function renderTokenPanel() {
+    const show = isAuthenticated();
+    if (elements.tokenCard) {
+      elements.tokenCard.classList.toggle("tt-hidden", !show);
+    }
+    if (!show) {
+      return;
+    }
+    if (elements.tokenActiveMap) {
+      elements.tokenActiveMap.textContent = activeMapSummaryText();
+    }
+    if (elements.layerGroup && elements.layerGroup.parentElement) {
+      elements.layerGroup.parentElement.classList.toggle("tt-hidden", !isDm());
+    }
+    if (elements.tokenPlayerList && elements.tokenPlayerList.parentElement) {
+      elements.tokenPlayerList.parentElement.classList.toggle("tt-hidden", !isDm());
+    }
+    renderConnectedPlayerList();
+    renderTokenRoster();
+    renderInlineTokenInfo();
+    renderSelectedTokenControls();
+    setTokenLayer(state.tokenLayer || "tokens");
+  }
+
+  function renderLightingEditor() {
+    const show = isDm();
+    if (elements.lightingCard) {
+      elements.lightingCard.classList.toggle("tt-hidden", !show);
+    }
+    if (!show) {
+      return;
+    }
+    if (elements.lightingActiveMap) {
+      elements.lightingActiveMap.textContent = activeMapSummaryText();
+    }
+    const lighting = lightingSettings();
+    if (elements.lightingMode) {
+      elements.lightingMode.value = lighting.mode;
+    }
+    if (elements.lightingDimAmount && document.activeElement !== elements.lightingDimAmount) {
+      elements.lightingDimAmount.value = String(lighting.dimAlpha);
+    }
+    if (elements.lightingDimAmountValue) {
+      elements.lightingDimAmountValue.textContent = `${Math.round(lighting.dimAlpha * 100)}%`;
+    }
+    if (elements.lightingDarkvisionTint && document.activeElement !== elements.lightingDarkvisionTint) {
+      elements.lightingDarkvisionTint.value = normalizeTerrainColor(lighting.darkvisionTint);
+    }
+    if (elements.lightingDarkvisionStrength && document.activeElement !== elements.lightingDarkvisionStrength) {
+      elements.lightingDarkvisionStrength.value = String(lighting.darkvisionAlpha);
+    }
+    updateLightingLabels();
+    const selectedSource = selectedLightingSource();
+    if (selectedSource) {
+      fillLightingSourceForm(selectedSource);
+    } else if (state.lightingUi.selectedSourceId) {
+      clearLightingSourceSelection({ clearPlacement: false });
+    }
+    renderLightingSourceList();
+  }
+
   function renderMaps() {
     const show = isDm();
     elements.mapCard.classList.toggle("tt-hidden", !show);
@@ -2789,6 +3174,8 @@
       elements.drawingLayerRow.classList.toggle("tt-hidden", !show);
     }
     if (!show) {
+      renderTokenPanel();
+      renderLightingEditor();
       updateInteractionModeUi();
       return;
     }
@@ -2855,8 +3242,8 @@
     }
 
     renderTerrainEditor();
-    renderTokenRoster();
-    renderSelectedTokenControls();
+    renderTokenPanel();
+    renderLightingEditor();
     updateInteractionModeUi();
   }
 
@@ -2946,13 +3333,12 @@
       return;
     }
     const paintMode = isPaintModeActive();
-    const placeMode = isPlaceModeActive();
-    const toolMode = !paintMode && !placeMode;
+    const toolMode = isToolInteractionEnabled();
     elements.mapGridWrap.classList.toggle("tt-mode-paint", paintMode);
     elements.mapGridWrap.classList.toggle("tt-mode-measure", toolMode);
     if (elements.brushPanel) {
-      elements.brushPanel.style.opacity = placeMode ? "0.4" : "";
-      elements.brushPanel.style.pointerEvents = placeMode ? "none" : "";
+      elements.brushPanel.style.opacity = "";
+      elements.brushPanel.style.pointerEvents = "";
     }
     if (elements.drawingLayerRow) {
       elements.drawingLayerRow.classList.toggle("tt-hidden", !isDm());
@@ -2986,6 +3372,58 @@
       return Boolean(character && character.ownerUserId === me);
     }
     return token.ownerUserId === me;
+  }
+
+  function canCurrentUserInspectToken(token) {
+    if (!token) {
+      return false;
+    }
+    if (isDm()) {
+      return true;
+    }
+    return canCurrentUserControlToken(token);
+  }
+
+  function tokenSourceEntity(token) {
+    if (!token) {
+      return null;
+    }
+    if (token.sourceType === "character") {
+      return characters().find((character) => character.id === token.sourceId) || null;
+    }
+    if (token.sourceType === "statblock") {
+      return statblocks().find((statblock) => statblock.id === token.sourceId) || null;
+    }
+    return null;
+  }
+
+  function handleLightingCellClick(x, y) {
+    if (!isDm()) {
+      return;
+    }
+    const selectedSource = selectedLightingSource();
+    if (selectedSource) {
+      emit("lighting:sourceUpdate", {
+        sourceId: selectedSource.id,
+        x,
+        y,
+        ...lightingSourceFormPayload(),
+      });
+      state.lightingUi.pendingPlacement = null;
+      setStatus(`Moved ${selectedSource.name}.`);
+      return;
+    }
+    if (!state.lightingUi.pendingPlacement) {
+      setStatus("Arm a light placement first.", true);
+      return;
+    }
+    emit("lighting:sourceCreate", {
+      x,
+      y,
+      ...state.lightingUi.pendingPlacement,
+    });
+    setStatus(`Placed ${state.lightingUi.pendingPlacement.name}.`);
+    state.lightingUi.pendingPlacement = null;
   }
 
   function placeTokenAt(x, y, placement) {
@@ -3023,12 +3461,21 @@
       return;
     }
 
-    if (isDm() && mode === "place") {
+    if (mode === "lighting") {
+      handleLightingCellClick(x, y);
+      return;
+    }
+
+    if (mode === "place") {
       if (!state.selectedPlacement) {
         setStatus("Select a token source first.", true);
         return;
       }
       placeTokenAt(x, y, state.selectedPlacement);
+      return;
+    }
+
+    if (state.activeMenu !== "tokens") {
       return;
     }
 
@@ -3098,11 +3545,18 @@
   function drawDoorTile(context, tile, left, top, cellSize) {
     context.save();
     context.globalAlpha = tile.doorOpen ? Math.min(0.45, tile.alpha || 1) : tile.alpha || 1;
-    const gradient = context.createLinearGradient(left, top, left + cellSize, top + cellSize);
-    gradient.addColorStop(0, "#6d4a28");
-    gradient.addColorStop(0.5, "#b3804f");
-    gradient.addColorStop(1, "#6d4a28");
-    context.fillStyle = gradient;
+    const textureCanvas = tile.textureId ? cachedTextureTile(tile.textureId, cellSize) : null;
+    if (textureCanvas) {
+      context.drawImage(textureCanvas, left, top, cellSize, cellSize);
+    } else {
+      const gradient = context.createLinearGradient(left, top, left + cellSize, top + cellSize);
+      gradient.addColorStop(0, "#6d4a28");
+      gradient.addColorStop(0.5, "#b3804f");
+      gradient.addColorStop(1, "#6d4a28");
+      context.fillStyle = gradient;
+      context.fillRect(left + 1, top + 1, cellSize - 2, cellSize - 2);
+    }
+    context.fillStyle = "rgba(56, 31, 14, 0.32)";
     context.fillRect(left + 1, top + 1, cellSize - 2, cellSize - 2);
     context.strokeStyle = tile.doorLocked ? "#f5d36a" : "rgba(255,255,255,0.26)";
     context.lineWidth = 1.5;
@@ -3244,14 +3698,411 @@
     });
   }
 
+  function isTerrainComponentBlockingVision(component) {
+    if (!component || component.layerType !== "foreground" || !component.tile) {
+      return false;
+    }
+    if (component.tile.kind === "door") {
+      return !component.tile.doorOpen && component.tile.blocksVision !== false;
+    }
+    return component.tile.blocksVision === true;
+  }
+
+  function isTerrainComponentBlockingLight(component) {
+    if (!component || component.layerType !== "foreground" || !component.tile) {
+      return false;
+    }
+    if (component.tile.kind === "door") {
+      return !component.tile.doorOpen && component.tile.blocksLight !== false;
+    }
+    return component.tile.blocksLight === true;
+  }
+
+  function mapCellIndex(map, x, y) {
+    return y * map.cols + x;
+  }
+
+  function buildVisibilityBlockers(map) {
+    const cacheKey = map ? `${map.id}:${map.updatedAt || ""}:blockers` : "";
+    if (state.lightingUi.blockerCacheKey === cacheKey && state.lightingUi.blockerCache) {
+      return state.lightingUi.blockerCache;
+    }
+    const total = map.rows * map.cols;
+    const vision = new Uint8Array(total);
+    const light = new Uint8Array(total);
+    for (let y = 0; y < map.rows; y += 1) {
+      for (let x = 0; x < map.cols; x += 1) {
+        const component = topTerrainCellAt(x, y, map);
+        const index = mapCellIndex(map, x, y);
+        if (isTerrainComponentBlockingVision(component)) {
+          vision[index] = 1;
+        }
+        if (isTerrainComponentBlockingLight(component)) {
+          light[index] = 1;
+        }
+      }
+    }
+    state.lightingUi.blockerCacheKey = cacheKey;
+    state.lightingUi.blockerCache = { vision, light };
+    return state.lightingUi.blockerCache;
+  }
+
+  function computeFieldOfView(map, originX, originY, radiusSquares, blockers) {
+    const visible = new Uint8Array(map.rows * map.cols);
+    if (originX < 0 || originY < 0 || originX >= map.cols || originY >= map.rows) {
+      return visible;
+    }
+    const radius = Math.max(0, Math.ceil(radiusSquares));
+    const radiusSq = radiusSquares * radiusSquares;
+    const setVisible = (x, y) => {
+      if (x < 0 || y < 0 || x >= map.cols || y >= map.rows) {
+        return;
+      }
+      visible[mapCellIndex(map, x, y)] = 1;
+    };
+    const blocks = (x, y) => {
+      if (x < 0 || y < 0 || x >= map.cols || y >= map.rows) {
+        return true;
+      }
+      return blockers[mapCellIndex(map, x, y)] === 1;
+    };
+
+    setVisible(originX, originY);
+    if (radius <= 0) {
+      return visible;
+    }
+
+    const castLight = (row, start, end, xx, xy, yx, yy) => {
+      if (start < end) {
+        return;
+      }
+      let nextStart = start;
+      for (let distance = row; distance <= radius; distance += 1) {
+        let blocked = false;
+        for (let deltaX = -distance, deltaY = -distance; deltaX <= 0; deltaX += 1) {
+          const leftSlope = (deltaX - 0.5) / (deltaY + 0.5);
+          const rightSlope = (deltaX + 0.5) / (deltaY - 0.5);
+          if (start < rightSlope) {
+            continue;
+          }
+          if (end > leftSlope) {
+            break;
+          }
+
+          const offsetX = deltaX * xx + deltaY * xy;
+          const offsetY = deltaX * yx + deltaY * yy;
+          const x = originX + offsetX;
+          const y = originY + offsetY;
+          const distSq = deltaX * deltaX + deltaY * deltaY;
+          if (x >= 0 && y >= 0 && x < map.cols && y < map.rows && distSq <= radiusSq + 0.0001) {
+            setVisible(x, y);
+          }
+
+          const opaque = blocks(x, y);
+          if (blocked) {
+            if (opaque) {
+              nextStart = rightSlope;
+            } else {
+              blocked = false;
+              start = nextStart;
+            }
+          } else if (opaque && distance < radius) {
+            blocked = true;
+            castLight(distance + 1, start, leftSlope, xx, xy, yx, yy);
+            nextStart = rightSlope;
+          }
+        }
+        if (blocked) {
+          break;
+        }
+      }
+    };
+
+    castLight(1, 1, 0, 1, 0, 0, 1);
+    castLight(1, 1, 0, 0, 1, 1, 0);
+    castLight(1, 1, 0, 0, -1, 1, 0);
+    castLight(1, 1, 0, -1, 0, 0, 1);
+    castLight(1, 1, 0, -1, 0, 0, -1);
+    castLight(1, 1, 0, 0, -1, -1, 0);
+    castLight(1, 1, 0, 0, 1, -1, 0);
+    castLight(1, 1, 0, 1, 0, 0, -1);
+    return visible;
+  }
+
+  function collectLightSources(map) {
+    const sources = lightingSources(map).map((source) => ({
+      id: source.id,
+      name: source.name,
+      x: Number(source.x) || 0,
+      y: Number(source.y) || 0,
+      brightRadius: clampLightRadiusFeet(source.brightRadius),
+      dimRadius: clampLightRadiusFeet(source.dimRadius),
+      color: normalizeTerrainColor(source.color || "#f5c56c"),
+      kind: "map",
+    }));
+    (map.tokens || []).forEach((token) => {
+      if (!token || token.layer !== "tokens") {
+        return;
+      }
+      const vision = normalizeTokenVisionConfig(token.vision);
+      if (vision.brightRadius <= 0 && vision.dimRadius <= 0) {
+        return;
+      }
+      sources.push({
+        id: token.id,
+        name: token.name,
+        x: Number(token.x) || 0,
+        y: Number(token.y) || 0,
+        brightRadius: vision.brightRadius,
+        dimRadius: vision.dimRadius,
+        color: normalizeTerrainColor(vision.auraColor || "#f5c56c"),
+        kind: "token",
+      });
+    });
+    return sources;
+  }
+
+  function computeIlluminationGrid(map, blockers) {
+    const illumination = new Uint8Array(map.rows * map.cols);
+    const feetPerCell = feetPerSquare(map);
+    collectLightSources(map).forEach((source) => {
+      const brightRadiusSquares = source.brightRadius / feetPerCell;
+      const totalRadiusSquares = (source.brightRadius + source.dimRadius) / feetPerCell;
+      if (totalRadiusSquares <= 0) {
+        return;
+      }
+      const visible = computeFieldOfView(map, source.x, source.y, totalRadiusSquares, blockers);
+      const brightSq = brightRadiusSquares * brightRadiusSquares;
+      const totalSq = totalRadiusSquares * totalRadiusSquares;
+      for (let y = 0; y < map.rows; y += 1) {
+        for (let x = 0; x < map.cols; x += 1) {
+          const index = mapCellIndex(map, x, y);
+          if (!visible[index]) {
+            continue;
+          }
+          const dx = x - source.x;
+          const dy = y - source.y;
+          const distSq = dx * dx + dy * dy;
+          if (brightRadiusSquares > 0 && distSq <= brightSq + 0.0001) {
+            illumination[index] = 2;
+          } else if (distSq <= totalSq + 0.0001) {
+            illumination[index] = Math.max(illumination[index], 1);
+          }
+        }
+      }
+    });
+    return illumination;
+  }
+
+  function computePlayerVisibility(map) {
+    const lighting = lightingSettings(map);
+    const total = map.rows * map.cols;
+    const visible = new Uint8Array(total);
+    if (isDm()) {
+      visible.fill(3);
+      return { cells: visible, illumination: new Uint8Array(total) };
+    }
+    if (lighting.mode === "visible") {
+      visible.fill(3);
+      return { cells: visible, illumination: new Uint8Array(total) };
+    }
+    if (lighting.mode === "hidden") {
+      return { cells: visible, illumination: new Uint8Array(total) };
+    }
+
+    const blockers = buildVisibilityBlockers(map);
+    const illumination = computeIlluminationGrid(map, blockers.light);
+    const viewerTokens = (map.tokens || []).filter(
+      (token) => token && token.layer === "tokens" && canCurrentUserControlToken(token)
+    );
+    if (viewerTokens.length === 0) {
+      return { cells: visible, illumination };
+    }
+
+    const maxRadiusSquares = Math.ceil(Math.hypot(map.rows, map.cols));
+    const feetPerCell = feetPerSquare(map);
+
+    viewerTokens.forEach((token) => {
+      const vision = normalizeTokenVisionConfig(token.vision);
+      const sight = computeFieldOfView(map, token.x, token.y, maxRadiusSquares, blockers.vision);
+      const lightSight = computeFieldOfView(map, token.x, token.y, maxRadiusSquares, blockers.light);
+      const darkvisionSquares = vision.darkvisionRadius / feetPerCell;
+      const darkvisionSq = darkvisionSquares * darkvisionSquares;
+
+      for (let y = 0; y < map.rows; y += 1) {
+        for (let x = 0; x < map.cols; x += 1) {
+          const index = mapCellIndex(map, x, y);
+          if (!sight[index]) {
+            continue;
+          }
+          if (illumination[index] > 0 && lightSight[index]) {
+            visible[index] = Math.max(visible[index], illumination[index] === 2 ? 3 : 2);
+            continue;
+          }
+          if (darkvisionSquares > 0) {
+            const dx = x - token.x;
+            const dy = y - token.y;
+            const distSq = dx * dx + dy * dy;
+            if (distSq <= darkvisionSq + 0.0001) {
+              visible[index] = Math.max(visible[index], 1);
+            }
+          }
+        }
+      }
+    });
+
+    return { cells: visible, illumination };
+  }
+
+  function visibilityStateForMap(map) {
+    const cacheKey =
+      map && state.snapshot && state.snapshot.auth
+        ? `${map.id}:${map.updatedAt || ""}:${state.snapshot.auth.campaignRole || ""}:${userId() || ""}`
+        : "";
+    if (state.lightingUi.visibilityCacheKey === cacheKey && state.lightingUi.visibilityCache) {
+      return state.lightingUi.visibilityCache;
+    }
+    const next = map ? computePlayerVisibility(map) : null;
+    state.lightingUi.visibilityCacheKey = cacheKey;
+    state.lightingUi.visibilityCache = next;
+    return next;
+  }
+
+  function renderVisionLayer(map, cellSize, visibilityState) {
+    if (!elements.mapVisionLayer) {
+      return;
+    }
+    const canvas = elements.mapVisionLayer;
+    const width = map.cols * cellSize;
+    const height = map.rows * cellSize;
+    canvas.width = width;
+    canvas.height = height;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return;
+    }
+    context.clearRect(0, 0, width, height);
+    if (isDm() || !visibilityState) {
+      return;
+    }
+    const lighting = lightingSettings(map);
+    const darkvisionRgb = [
+      Number.parseInt(lighting.darkvisionTint.slice(1, 3), 16),
+      Number.parseInt(lighting.darkvisionTint.slice(3, 5), 16),
+      Number.parseInt(lighting.darkvisionTint.slice(5, 7), 16),
+    ];
+    for (let y = 0; y < map.rows; y += 1) {
+      for (let x = 0; x < map.cols; x += 1) {
+        const stateValue = visibilityState.cells[mapCellIndex(map, x, y)];
+        const left = x * cellSize;
+        const top = y * cellSize;
+        if (stateValue === 3) {
+          continue;
+        }
+        if (stateValue === 2) {
+          context.fillStyle = `rgba(0, 0, 0, ${lighting.dimAlpha})`;
+          context.fillRect(left, top, cellSize, cellSize);
+          continue;
+        }
+        if (stateValue === 1) {
+          context.fillStyle = "rgba(0, 0, 0, 0.62)";
+          context.fillRect(left, top, cellSize, cellSize);
+          context.fillStyle = `rgba(${darkvisionRgb[0]}, ${darkvisionRgb[1]}, ${darkvisionRgb[2]}, ${lighting.darkvisionAlpha})`;
+          context.fillRect(left, top, cellSize, cellSize);
+          continue;
+        }
+        context.fillStyle = "rgba(2, 4, 4, 0.94)";
+        context.fillRect(left, top, cellSize, cellSize);
+      }
+    }
+  }
+
+  function renderLightingLayer(map, cellSize) {
+    if (!elements.mapLightingLayer) {
+      return;
+    }
+    elements.mapLightingLayer.innerHTML = "";
+    elements.mapLightingLayer.style.gridTemplateColumns = `repeat(${map.cols}, ${cellSize}px)`;
+    elements.mapLightingLayer.style.gridTemplateRows = `repeat(${map.rows}, ${cellSize}px)`;
+    const showLightingLayer = isDm() && state.activeMenu === "lighting";
+    if (!showLightingLayer) {
+      return;
+    }
+    const feetPerCell = feetPerSquare(map);
+    lightingSources(map).forEach((source) => {
+      const holder = document.createElement("div");
+      holder.className = "tt-token-holder";
+      holder.style.gridColumnStart = String((Number(source.x) || 0) + 1);
+      holder.style.gridRowStart = String((Number(source.y) || 0) + 1);
+      holder.style.width = `${cellSize}px`;
+      holder.style.height = `${cellSize}px`;
+      holder.style.position = "relative";
+
+      const totalFeet = (Number(source.brightRadius) || 0) + (Number(source.dimRadius) || 0);
+      const totalRadiusSquares = totalFeet / feetPerCell;
+      const brightRadiusSquares = (Number(source.brightRadius) || 0) / feetPerCell;
+      const color = normalizeTerrainColor(source.color || "#f5c56c");
+
+      if (totalRadiusSquares > 0) {
+        const dimRing = document.createElement("div");
+        dimRing.className = "tt-light-source-ring";
+        dimRing.style.color = color;
+        dimRing.style.width = `${Math.max(14, totalRadiusSquares * cellSize * 2)}px`;
+        dimRing.style.height = dimRing.style.width;
+        holder.appendChild(dimRing);
+      }
+      if (brightRadiusSquares > 0) {
+        const brightRing = document.createElement("div");
+        brightRing.className = "tt-light-source-ring";
+        brightRing.style.color = color;
+        brightRing.style.opacity = "0.62";
+        brightRing.style.borderStyle = "solid";
+        brightRing.style.width = `${Math.max(10, brightRadiusSquares * cellSize * 2)}px`;
+        brightRing.style.height = brightRing.style.width;
+        holder.appendChild(brightRing);
+      }
+
+      const marker = document.createElement("button");
+      marker.type = "button";
+      marker.className = "tt-light-source-marker";
+      if (source.id === state.lightingUi.selectedSourceId) {
+        marker.classList.add("is-selected");
+      }
+      marker.style.color = color;
+      marker.style.background = color;
+      marker.title = source.name || "Light Source";
+      marker.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        fillLightingSourceForm(source);
+        renderLightingEditor();
+        renderMapGrid();
+      });
+      holder.appendChild(marker);
+
+      elements.mapLightingLayer.appendChild(holder);
+    });
+  }
+
   function renderMapGrid() {
     const map = activeMap();
     elements.mapGridCells.innerHTML = "";
     elements.mapGridTokens.innerHTML = "";
+    if (elements.mapLightingLayer) {
+      elements.mapLightingLayer.innerHTML = "";
+    }
 
     if (!map) {
       if (elements.mapTerrainLayer) {
         elements.mapTerrainLayer.innerHTML = "";
+      }
+      if (elements.mapVisionLayer) {
+        const context = elements.mapVisionLayer.getContext("2d");
+        if (context) {
+          context.clearRect(0, 0, elements.mapVisionLayer.width, elements.mapVisionLayer.height);
+        }
       }
       state.terrain.layerRenderCache.clear();
       clearMeasurementOverlay();
@@ -3266,12 +4117,17 @@
     elements.mapGridCells.style.gridTemplateRows = `repeat(${map.rows}, ${cellSize}px)`;
     elements.mapGridTokens.style.gridTemplateColumns = `repeat(${map.cols}, ${cellSize}px)`;
     elements.mapGridTokens.style.gridTemplateRows = `repeat(${map.rows}, ${cellSize}px)`;
+    if (elements.mapLightingLayer) {
+      elements.mapLightingLayer.style.gridTemplateColumns = `repeat(${map.cols}, ${cellSize}px)`;
+      elements.mapLightingLayer.style.gridTemplateRows = `repeat(${map.rows}, ${cellSize}px)`;
+    }
     if (elements.mapMeasureOverlay) {
       elements.mapMeasureOverlay.setAttribute("viewBox", `0 0 ${map.cols * cellSize} ${map.rows * cellSize}`);
     }
     updateInteractionModeUi();
     ensureActiveTerrainLayer();
     scheduleTerrainCanvasRender();
+    const visibilityState = visibilityStateForMap(map);
 
     for (let y = 0; y < map.rows; y += 1) {
       for (let x = 0; x < map.cols; x += 1) {
@@ -3289,13 +4145,21 @@
             beginTerrainPaint(x, y);
             return;
           }
+          if (isLightingModeActive()) {
+            return;
+          }
           if (!isPlaceModeActive() && isToolInteractionEnabled()) {
             event.preventDefault();
             beginMeasureDrag(x, y, cellSize);
             renderMeasurementOverlay();
             return;
           }
-          if (!isPaintModeActive() && !isPlaceModeActive() && !isToolInteractionEnabled()) {
+          if (
+            state.activeMenu === "tokens" &&
+            !isPaintModeActive() &&
+            !isPlaceModeActive() &&
+            !isToolInteractionEnabled()
+          ) {
             event.preventDefault();
             beginDragSelect(event);
           }
@@ -3314,9 +4178,15 @@
         button.addEventListener("click", () => handleCellClick(x, y));
         if (isDm()) {
           button.addEventListener("dragover", (event) => {
+            if (state.activeMenu !== "tokens") {
+              return;
+            }
             event.preventDefault();
           });
           button.addEventListener("drop", (event) => {
+            if (state.activeMenu !== "tokens") {
+              return;
+            }
             event.preventDefault();
             const raw = event.dataTransfer
               ? event.dataTransfer.getData("application/x-tabletop-placement") ||
@@ -3341,6 +4211,9 @@
     }
 
     map.tokens.forEach((token) => {
+      const tokenVision = normalizeTokenVisionConfig(token.vision);
+      const cellState = visibilityState ? visibilityState.cells[mapCellIndex(map, token.x, token.y)] : 3;
+      const isVisibleToViewer = isDm() || cellState > 0;
       const holder = document.createElement("div");
       holder.className = "tt-token-holder";
       holder.style.gridColumnStart = String(token.x + 1);
@@ -3348,6 +4221,15 @@
       holder.style.width = `${cellSize}px`;
       holder.style.height = `${cellSize}px`;
       holder.style.position = "relative";
+
+      if (tokenVision.auraRadius > 0 && isVisibleToViewer) {
+        const aura = document.createElement("div");
+        aura.className = "tt-token-aura";
+        aura.style.color = normalizeTerrainColor(tokenVision.auraColor || DEFAULT_TOKEN_AURA_COLOR);
+        aura.style.width = `${Math.max(12, (tokenVision.auraRadius / feetPerSquare(map)) * cellSize * 2)}px`;
+        aura.style.height = aura.style.width;
+        holder.appendChild(aura);
+      }
 
       const tokenEl = document.createElement("div");
       tokenEl.className = "tt-token";
@@ -3360,6 +4242,13 @@
       }
       if (state.selectedTokenIds.has(token.id)) {
         tokenEl.classList.add("tt-token-selected");
+      }
+      if (!isVisibleToViewer) {
+        tokenEl.classList.add("tt-token-hidden");
+      } else if (!isDm() && cellState === 2) {
+        tokenEl.classList.add("tt-token-dim");
+      } else if (!isDm() && cellState === 1) {
+        tokenEl.classList.add("tt-token-darkvision");
       }
 
       if (token.tokenImage) {
@@ -3392,38 +4281,65 @@
         }
         event.preventDefault();
         event.stopPropagation();
-        if (!canCurrentUserControlToken(token)) {
+        if (!canCurrentUserInspectToken(token)) {
           return;
         }
-        if (event.shiftKey) {
-          if (state.selectedTokenIds.has(token.id)) {
-            state.selectedTokenIds.delete(token.id);
-          } else {
-            state.selectedTokenIds.add(token.id);
-          }
-        } else {
-          if (state.selectedTokenIds.has(token.id) && state.selectedTokenIds.size === 1) {
-            state.selectedTokenIds.clear();
-          } else {
-            state.selectedTokenIds.clear();
-            state.selectedTokenIds.add(token.id);
-          }
+        state.lightingUi.tokenInfoTokenId = token.id;
+        if (state.activeMenu !== "tokens") {
+          openTokenInfoModal(token);
         }
-        renderSelectedTokenControls();
-        renderMapGrid();
+        if (state.activeMenu === "tokens" && canCurrentUserControlToken(token)) {
+          if (event.shiftKey) {
+            if (state.selectedTokenIds.has(token.id)) {
+              state.selectedTokenIds.delete(token.id);
+            } else {
+              state.selectedTokenIds.add(token.id);
+            }
+          } else {
+            if (state.selectedTokenIds.has(token.id) && state.selectedTokenIds.size === 1) {
+              state.selectedTokenIds.clear();
+            } else {
+              state.selectedTokenIds.clear();
+              state.selectedTokenIds.add(token.id);
+            }
+          }
+          renderTokenPanel();
+          renderMapGrid();
+        } else if (state.activeMenu === "tokens") {
+          renderTokenPanel();
+        }
+      });
+
+      tokenEl.addEventListener("dblclick", (event) => {
+        if (!isDm() || token.sourceType !== "character" || !token.ownerUserId) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        openTokenConfigModal(token);
       });
 
       if (canCurrentUserControlToken(token)) {
-        tokenEl.title = "Click to select, then click a destination tile to move.";
+        tokenEl.title = state.activeMenu === "tokens"
+          ? "Click for info and selection, then click a destination tile to move."
+          : "Click for token info.";
+      } else if (canCurrentUserInspectToken(token)) {
+        tokenEl.title = "Click for token info.";
       } else {
         tokenEl.title = token.name;
       }
 
       if (isDm()) {
         holder.addEventListener("dragover", (event) => {
+          if (state.activeMenu !== "tokens") {
+            return;
+          }
           event.preventDefault();
         });
         holder.addEventListener("drop", (event) => {
+          if (state.activeMenu !== "tokens") {
+            return;
+          }
           event.preventDefault();
           const raw = event.dataTransfer
             ? event.dataTransfer.getData("application/x-tabletop-placement") ||
@@ -3448,17 +4364,61 @@
       elements.mapGridTokens.appendChild(holder);
     });
 
+    renderLightingLayer(map, cellSize);
+    renderVisionLayer(map, cellSize, visibilityState);
     renderMeasurementOverlay();
     applyMapViewTransform();
   }
 
   function renderTokenRoster() {
-    if (!isDm()) {
+    if (!elements.tokenRoster) {
+      return;
+    }
+    if (!isAuthenticated()) {
       elements.tokenRoster.innerHTML = "";
       return;
     }
 
     elements.tokenRoster.innerHTML = "";
+
+    if (!isDm()) {
+      const controlledTokens = ((activeMap() && activeMap().tokens) || []).filter((token) =>
+        canCurrentUserControlToken(token)
+      );
+      if (controlledTokens.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "tt-inline-value";
+        empty.textContent = "Open the map and click one of your tokens to move it.";
+        elements.tokenRoster.appendChild(empty);
+        return;
+      }
+      controlledTokens.forEach((token) => {
+        const item = document.createElement("div");
+        item.className = "tt-list-item";
+        const left = document.createElement("div");
+        const name = document.createElement("div");
+        name.textContent = token.name;
+        left.appendChild(name);
+        const detail = document.createElement("div");
+        detail.className = "tt-log-meta";
+        detail.textContent = `(${token.x + 1}, ${token.y + 1})`;
+        left.appendChild(detail);
+        item.appendChild(left);
+        const selectButton = document.createElement("button");
+        selectButton.type = "button";
+        selectButton.textContent = state.selectedTokenIds.has(token.id) ? "Selected" : "Select";
+        selectButton.addEventListener("click", () => {
+          state.lightingUi.tokenInfoTokenId = token.id;
+          state.selectedTokenIds.clear();
+          state.selectedTokenIds.add(token.id);
+          renderTokenPanel();
+          renderMapGrid();
+        });
+        item.appendChild(selectButton);
+        elements.tokenRoster.appendChild(item);
+      });
+      return;
+    }
 
     const allEntries = [
       ...characters().map((character) => ({
@@ -3580,6 +4540,90 @@
       return;
     }
     elements.selectedTokenControls.classList.remove("tt-hidden");
+  }
+
+  function tokenInfoPairs(token) {
+    const entity = tokenSourceEntity(token);
+    const parsed = (entity && entity.parsedSheet) || {};
+    const currentValues = parsed.currentValues && typeof parsed.currentValues === "object"
+      ? parsed.currentValues
+      : {};
+    const lookup = new Map(Object.keys(currentValues).map((key) => [normalizeLabel(key), currentValues[key]]));
+    const readStat = (primary, fallback = "") => {
+      if (lookup.has(primary)) {
+        return lookup.get(primary);
+      }
+      if (fallback && lookup.has(fallback)) {
+        return lookup.get(fallback);
+      }
+      return "";
+    };
+    const vision = normalizeTokenVisionConfig(token && token.vision);
+    const pairs = [
+      { key: "Current HP", value: readStat("current hp", "hp") },
+      { key: "AC", value: readStat("ac") },
+      { key: "Current Mana", value: readStat("current mana", "mana") },
+      { key: "Speed", value: readStat("speed") || token.movementMax },
+      { key: "Initiative", value: token.initiativeMod },
+      { key: "Bright Light", value: vision.brightRadius ? `${vision.brightRadius} ft` : "-" },
+      { key: "Dim Light", value: vision.dimRadius ? `${vision.dimRadius} ft` : "-" },
+      { key: "Darkvision", value: vision.darkvisionRadius ? `${vision.darkvisionRadius} ft` : "-" },
+    ];
+    return pairs.filter((pair) => pair.value !== "" && pair.value !== undefined && pair.value !== null);
+  }
+
+  function openTokenInfoModal(token) {
+    if (!elements.tokenInfoModal || !elements.tokenInfoGrid || !elements.tokenInfoTitle) {
+      return;
+    }
+    state.lightingUi.tokenInfoTokenId = token ? token.id : null;
+    elements.tokenInfoTitle.textContent = token ? token.name : "Token Info";
+    renderStatGrid(elements.tokenInfoGrid, token ? tokenInfoPairs(token) : []);
+    elements.tokenInfoModal.classList.remove("tt-hidden");
+  }
+
+  function closeTokenInfoModal() {
+    state.lightingUi.tokenInfoTokenId = null;
+    if (elements.tokenInfoModal) {
+      elements.tokenInfoModal.classList.add("tt-hidden");
+    }
+  }
+
+  function openTokenConfigModal(token) {
+    if (!token || !isDm() || !elements.tokenConfigModal) {
+      return;
+    }
+    const vision = normalizeTokenVisionConfig(token.vision);
+    state.lightingUi.tokenConfigTokenId = token.id;
+    if (elements.tokenConfigTitle) {
+      elements.tokenConfigTitle.textContent = `${token.name} Lighting`;
+    }
+    if (elements.tokenConfigTokenId) {
+      elements.tokenConfigTokenId.value = token.id;
+    }
+    if (elements.tokenConfigBright) {
+      elements.tokenConfigBright.value = String(vision.brightRadius || 0);
+    }
+    if (elements.tokenConfigDim) {
+      elements.tokenConfigDim.value = String(vision.dimRadius || 0);
+    }
+    if (elements.tokenConfigDarkvision) {
+      elements.tokenConfigDarkvision.value = String(vision.darkvisionRadius || 0);
+    }
+    if (elements.tokenConfigAuraRadius) {
+      elements.tokenConfigAuraRadius.value = String(vision.auraRadius || 0);
+    }
+    if (elements.tokenConfigAuraColor) {
+      elements.tokenConfigAuraColor.value = normalizeTerrainColor(vision.auraColor || DEFAULT_TOKEN_AURA_COLOR);
+    }
+    elements.tokenConfigModal.classList.remove("tt-hidden");
+  }
+
+  function closeTokenConfigModal() {
+    state.lightingUi.tokenConfigTokenId = null;
+    if (elements.tokenConfigModal) {
+      elements.tokenConfigModal.classList.add("tt-hidden");
+    }
   }
 
   const HIDDEN_SELF_MODIFIERS = new Set(["bottled_luck"]);
@@ -4259,6 +5303,26 @@
     renderLogs();
     renderInitiativePanel();
     renderMapAndInitiativeSummary();
+    if (state.lightingUi.tokenInfoTokenId && elements.tokenInfoModal && !elements.tokenInfoModal.classList.contains("tt-hidden")) {
+      const token = getTokenById(state.lightingUi.tokenInfoTokenId);
+      if (token) {
+        openTokenInfoModal(token);
+      } else {
+        closeTokenInfoModal();
+      }
+    }
+    if (
+      state.lightingUi.tokenConfigTokenId &&
+      elements.tokenConfigModal &&
+      !elements.tokenConfigModal.classList.contains("tt-hidden")
+    ) {
+      const token = getTokenById(state.lightingUi.tokenConfigTokenId);
+      if (token) {
+        openTokenConfigModal(token);
+      } else {
+        closeTokenConfigModal();
+      }
+    }
     applyMenuVisibility();
     setActiveTool(activeTool());
     if (elements.distanceMode) {
@@ -4370,9 +5434,21 @@
       setLeftPanelCollapsed(false);
     });
   }
-  if (elements.railBattlemaps) {
-    elements.railBattlemaps.addEventListener("click", () => {
-      setActiveMenu("battlemaps");
+  if (elements.railTokens) {
+    elements.railTokens.addEventListener("click", () => {
+      setActiveMenu("tokens");
+      setLeftPanelCollapsed(false);
+    });
+  }
+  if (elements.railTerrain) {
+    elements.railTerrain.addEventListener("click", () => {
+      setActiveMenu("terrain");
+      setLeftPanelCollapsed(false);
+    });
+  }
+  if (elements.railLighting) {
+    elements.railLighting.addEventListener("click", () => {
+      setActiveMenu("lighting");
       setLeftPanelCollapsed(false);
     });
   }
@@ -4711,13 +5787,80 @@
     });
   }
 
-  if (elements.modeGroup) {
-    elements.modeGroup.addEventListener("click", (event) => {
-      const btn = event.target.closest(".tt-seg");
-      if (!btn || !btn.dataset.value) {
+  if (elements.lightingMode) {
+    elements.lightingMode.addEventListener("change", () => {
+      scheduleMapAutosave();
+      renderMapGrid();
+    });
+  }
+  if (elements.lightingDimAmount) {
+    const syncDim = () => {
+      updateLightingLabels();
+      scheduleMapAutosave();
+      renderMapGrid();
+    };
+    elements.lightingDimAmount.addEventListener("input", syncDim);
+    elements.lightingDimAmount.addEventListener("change", syncDim);
+  }
+  if (elements.lightingDarkvisionTint) {
+    elements.lightingDarkvisionTint.addEventListener("input", () => {
+      scheduleMapAutosave();
+      renderMapGrid();
+    });
+    elements.lightingDarkvisionTint.addEventListener("change", () => {
+      scheduleMapAutosave();
+      renderMapGrid();
+    });
+  }
+  if (elements.lightingDarkvisionStrength) {
+    const syncDarkvision = () => {
+      updateLightingLabels();
+      scheduleMapAutosave();
+      renderMapGrid();
+    };
+    elements.lightingDarkvisionStrength.addEventListener("input", syncDarkvision);
+    elements.lightingDarkvisionStrength.addEventListener("change", syncDarkvision);
+  }
+  if (elements.lightingSourceArm) {
+    elements.lightingSourceArm.addEventListener("click", () => {
+      state.lightingUi.selectedSourceId = null;
+      if (elements.lightingSourceId) {
+        elements.lightingSourceId.value = "";
+      }
+      state.lightingUi.pendingPlacement = lightingSourceFormPayload();
+      setActiveMenu("lighting");
+      setStatus(`Armed ${state.lightingUi.pendingPlacement.name} for placement.`);
+    });
+  }
+  if (elements.lightingSourceSave) {
+    elements.lightingSourceSave.addEventListener("click", () => {
+      const source = selectedLightingSource();
+      if (!source) {
+        setStatus("Select a light source first.", true);
         return;
       }
-      setInteractionMode(btn.dataset.value);
+      emit("lighting:sourceUpdate", {
+        sourceId: source.id,
+        ...lightingSourceFormPayload(),
+      });
+    });
+  }
+  if (elements.lightingSourceClear) {
+    elements.lightingSourceClear.addEventListener("click", () => {
+      clearLightingSourceSelection();
+      renderLightingEditor();
+      renderMapGrid();
+    });
+  }
+  if (elements.lightingSourceDelete) {
+    elements.lightingSourceDelete.addEventListener("click", () => {
+      const source = selectedLightingSource();
+      if (!source) {
+        setStatus("Select a light source first.", true);
+        return;
+      }
+      emit("lighting:sourceDelete", { sourceId: source.id });
+      clearLightingSourceSelection();
     });
   }
 
@@ -4820,8 +5963,48 @@
       if (modalId === "terrain-color-modal") {
         closeTerrainColorModal();
       }
+      if (modalId === "token-info-modal") {
+        closeTokenInfoModal();
+      }
+      if (modalId === "token-config-modal") {
+        closeTokenConfigModal();
+      }
     });
   });
+
+  if (elements.tokenInfoClose) {
+    elements.tokenInfoClose.addEventListener("click", () => {
+      closeTokenInfoModal();
+    });
+  }
+
+  if (elements.tokenConfigClose) {
+    elements.tokenConfigClose.addEventListener("click", () => {
+      closeTokenConfigModal();
+    });
+  }
+
+  if (elements.tokenConfigSave) {
+    elements.tokenConfigSave.addEventListener("click", () => {
+      const tokenId = (elements.tokenConfigTokenId && elements.tokenConfigTokenId.value) || "";
+      if (!tokenId) {
+        return;
+      }
+      emit("token:update", {
+        tokenId,
+        vision: {
+          brightRadius: clampLightRadiusFeet(elements.tokenConfigBright && elements.tokenConfigBright.value),
+          dimRadius: clampLightRadiusFeet(elements.tokenConfigDim && elements.tokenConfigDim.value),
+          darkvisionRadius: clampLightRadiusFeet(elements.tokenConfigDarkvision && elements.tokenConfigDarkvision.value),
+          auraRadius: clampLightRadiusFeet(elements.tokenConfigAuraRadius && elements.tokenConfigAuraRadius.value),
+          auraColor: normalizeTerrainColor(
+            (elements.tokenConfigAuraColor && elements.tokenConfigAuraColor.value) || DEFAULT_TOKEN_AURA_COLOR
+          ),
+        },
+      });
+      closeTokenConfigModal();
+    });
+  }
 
   if (elements.layerGroup) {
     elements.layerGroup.addEventListener("click", (event) => {

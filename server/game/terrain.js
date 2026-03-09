@@ -234,8 +234,10 @@ function createBaseTile(tile, layerType, textureCatalog) {
     if (normalizedLayerType !== "foreground") {
       return null;
     }
+    const textureId = String(tile.textureId || "").trim();
     return {
       kind: "door",
+      textureId: textureId && isValidTextureId(textureCatalog, textureId) ? textureId : "",
       alpha: safeAlpha,
       blocksMovement: tile.blocksMovement !== false,
       blocksVision: tile.blocksVision !== false,

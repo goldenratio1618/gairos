@@ -28,6 +28,12 @@ const DEFAULT_GRID_COLS = 30;
 const HERB_SHEET_ID = "1_ly4-3ykWpQ47oDLyF2hDewntCJ4QR6hImODhmwNlYg";
 const HERB_SHEET_NAME = "RULES_HERBS";
 const DEFAULT_GM_TOKEN_OPACITY = 0.55;
+const DEFAULT_LIGHTING_MODE = "visible";
+const DEFAULT_DIM_LIGHT_ALPHA = 0.34;
+const DEFAULT_DARKVISION_TINT = "#6f89b8";
+const DEFAULT_DARKVISION_TINT_ALPHA = 0.42;
+const DEFAULT_TOKEN_AURA_COLOR = "#59a8ff";
+const MAX_LIGHT_RADIUS_FEET = 10_000;
 let activeTextureCatalog = buildTextureCatalog(DEFAULT_TERRAIN_TEXTURE_ROOT);
 
 const ROLL_MODIFIER_CATALOG = {
@@ -246,6 +252,108 @@ const INJURY_TABLES = {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function normalizeHexColor(value, fallback = "#ffffff") {
+  const raw = String(value || "").trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) {
+    return raw.toLowerCase();
+  }
+  if (/^#[0-9a-fA-F]{3}$/.test(raw)) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`.toLowerCase();
+  }
+  return fallback.toLowerCase();
+}
+
+function normalizeLightingMode(value) {
+  return ["visible", "hidden", "dynamic"].includes(value) ? value : DEFAULT_LIGHTING_MODE;
+}
+
+function clampLightRadiusFeet(value) {
+  return clamp(Number.parseFloat(value) || 0, 0, MAX_LIGHT_RADIUS_FEET);
+}
+
+function createDefaultMapLighting() {
+  return {
+    mode: DEFAULT_LIGHTING_MODE,
+    dimAlpha: DEFAULT_DIM_LIGHT_ALPHA,
+    darkvisionTint: DEFAULT_DARKVISION_TINT,
+    darkvisionAlpha: DEFAULT_DARKVISION_TINT_ALPHA,
+    sources: [],
+  };
+}
+
+function normalizeMapLightingSource(source, rows, cols) {
+  const safeRows = Math.max(1, Number.parseInt(rows, 10) || DEFAULT_GRID_ROWS);
+  const safeCols = Math.max(1, Number.parseInt(cols, 10) || DEFAULT_GRID_COLS);
+  return {
+    id: String((source && source.id) || createId("light")),
+    name: String((source && source.name) || "Light Source").slice(0, 120),
+    x: clamp(Number.parseInt(source && source.x, 10) || 0, 0, safeCols - 1),
+    y: clamp(Number.parseInt(source && source.y, 10) || 0, 0, safeRows - 1),
+    brightRadius: clampLightRadiusFeet(source && source.brightRadius),
+    dimRadius: clampLightRadiusFeet(source && source.dimRadius),
+    color: normalizeHexColor(source && source.color, "#f5c56c"),
+  };
+}
+
+function normalizeMapLightingShape(lighting, rows, cols) {
+  const next = lighting && typeof lighting === "object" ? lighting : {};
+  return {
+    mode: normalizeLightingMode(next.mode),
+    dimAlpha: clamp(Number.parseFloat(next.dimAlpha) || DEFAULT_DIM_LIGHT_ALPHA, 0, 0.95),
+    darkvisionTint: normalizeHexColor(next.darkvisionTint, DEFAULT_DARKVISION_TINT),
+    darkvisionAlpha: clamp(
+      Number.parseFloat(next.darkvisionAlpha) || DEFAULT_DARKVISION_TINT_ALPHA,
+      0,
+      0.95
+    ),
+    sources: (Array.isArray(next.sources) ? next.sources : [])
+      .filter((source) => source && typeof source === "object")
+      .map((source) => normalizeMapLightingSource(source, rows, cols)),
+  };
+}
+
+function normalizeTokenVisionConfig(vision) {
+  const next = vision && typeof vision === "object" ? vision : {};
+  return {
+    brightRadius: clampLightRadiusFeet(next.brightRadius),
+    dimRadius: clampLightRadiusFeet(next.dimRadius),
+    darkvisionRadius: clampLightRadiusFeet(next.darkvisionRadius),
+    auraRadius: clampLightRadiusFeet(next.auraRadius),
+    auraColor: normalizeHexColor(next.auraColor, DEFAULT_TOKEN_AURA_COLOR),
+  };
+}
+
+function normalizeMapTokenShape(token, map) {
+  if (!token || typeof token !== "object") {
+    return null;
+  }
+  return {
+    ...token,
+    id: String(token.id || createId("token")),
+    name: String(token.name || "Token").slice(0, 120),
+    sourceType: String(token.sourceType || "custom"),
+    sourceId: String(token.sourceId || ""),
+    ownerUserId: token.ownerUserId || null,
+    tokenImage: String(token.tokenImage || ""),
+    layer: token.layer === "gm" ? "gm" : "tokens",
+    x: clamp(Number.parseInt(token.x, 10) || 0, 0, Math.max(0, Number(map && map.cols) - 1)),
+    y: clamp(Number.parseInt(token.y, 10) || 0, 0, Math.max(0, Number(map && map.rows) - 1)),
+    movementMax: Math.max(0, Number.parseInt(token.movementMax, 10) || 30),
+    initiativeMod: Number.parseInt(token.initiativeMod, 10) || 0,
+    autoMove: Boolean(token.autoMove),
+    autoMoveType: String(token.autoMoveType || "wander"),
+    movementInfo:
+      token.movementInfo && typeof token.movementInfo === "object"
+        ? {
+          spent: Math.max(0, Number(token.movementInfo.spent) || 0),
+          max: Math.max(0, Number(token.movementInfo.max) || 0),
+          overLimit: Boolean(token.movementInfo.overLimit),
+        }
+        : null,
+    vision: normalizeTokenVisionConfig(token.vision),
+  };
 }
 
 function normalizeSkillName(name) {
@@ -899,10 +1007,12 @@ function resizeMapInPlace(map, rows, cols, textureCatalog = activeTextureCatalog
   resizeTerrainForMap(map, nextRows, nextCols, textureCatalog, createId);
   map.rows = nextRows;
   map.cols = nextCols;
+  map.lighting = normalizeMapLightingShape(map.lighting, nextRows, nextCols);
   if (Array.isArray(map.tokens)) {
     map.tokens.forEach((token) => {
       token.x = clamp(Number.parseInt(token.x, 10) || 0, 0, nextCols - 1);
       token.y = clamp(Number.parseInt(token.y, 10) || 0, 0, nextRows - 1);
+      token.vision = normalizeTokenVisionConfig(token.vision);
     });
   }
 }
@@ -918,6 +1028,7 @@ function createMap({ name, rows, cols, feetPerCell = 5, textureCatalog = activeT
     cols: safeCols,
     feetPerCell: safeFeetPerCell,
     gmTokenOpacity: DEFAULT_GM_TOKEN_OPACITY,
+    lighting: createDefaultMapLighting(),
     scenarioType: "standard",
     background: {
       imageDataUrl: "",
@@ -1309,6 +1420,7 @@ function normalizeMapShape(map) {
   if (!Number.isFinite(map.gmTokenOpacity)) {
     map.gmTokenOpacity = DEFAULT_GM_TOKEN_OPACITY;
   }
+  map.lighting = normalizeMapLightingShape(map.lighting, map.rows, map.cols);
   if (!map.background || typeof map.background !== "object") {
     map.background = { imageDataUrl: "" };
   }
@@ -1318,6 +1430,10 @@ function normalizeMapShape(map) {
   ensureTerrainLayers(map, activeTextureCatalog, createId);
   if (!Array.isArray(map.tokens)) {
     map.tokens = [];
+  } else {
+    map.tokens = map.tokens
+      .map((token) => normalizeMapTokenShape(token, map))
+      .filter(Boolean);
   }
   if (!Array.isArray(map.drawings)) {
     map.drawings = [];
@@ -3005,6 +3121,106 @@ function createTabletopSystem(io, options = {}) {
       if (payload && payload.gmTokenOpacity !== undefined) {
         map.gmTokenOpacity = clamp(Number.parseFloat(payload.gmTokenOpacity) || DEFAULT_GM_TOKEN_OPACITY, 0.1, 1);
       }
+      if (!map.lighting || typeof map.lighting !== "object") {
+        map.lighting = createDefaultMapLighting();
+      }
+      if (payload && payload.lightingMode !== undefined) {
+        map.lighting.mode = normalizeLightingMode(payload.lightingMode);
+      }
+      if (payload && payload.dimLightAlpha !== undefined) {
+        map.lighting.dimAlpha = clamp(
+          Number.parseFloat(payload.dimLightAlpha) || DEFAULT_DIM_LIGHT_ALPHA,
+          0,
+          0.95
+        );
+      }
+      if (payload && payload.darkvisionTint !== undefined) {
+        map.lighting.darkvisionTint = normalizeHexColor(payload.darkvisionTint, DEFAULT_DARKVISION_TINT);
+      }
+      if (payload && payload.darkvisionTintAlpha !== undefined) {
+        map.lighting.darkvisionAlpha = clamp(
+          Number.parseFloat(payload.darkvisionTintAlpha) || DEFAULT_DARKVISION_TINT_ALPHA,
+          0,
+          0.95
+        );
+      }
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
+    socket.on("lighting:sourceCreate", (payload) => {
+      if (!requireDm(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map) {
+        return;
+      }
+      map.lighting = normalizeMapLightingShape(map.lighting, map.rows, map.cols);
+      const source = normalizeMapLightingSource(
+        {
+          ...payload,
+          id: createId("light"),
+        },
+        map.rows,
+        map.cols
+      );
+      map.lighting.sources.push(source);
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
+    socket.on("lighting:sourceUpdate", (payload) => {
+      if (!requireDm(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map) {
+        return;
+      }
+      map.lighting = normalizeMapLightingShape(map.lighting, map.rows, map.cols);
+      const sourceId = String((payload && payload.sourceId) || "");
+      const source = map.lighting.sources.find((entry) => entry.id === sourceId);
+      if (!source) {
+        return;
+      }
+      const next = normalizeMapLightingSource(
+        {
+          ...source,
+          ...(payload && typeof payload === "object" ? payload : {}),
+          id: source.id,
+        },
+        map.rows,
+        map.cols
+      );
+      Object.assign(source, next);
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
+    socket.on("lighting:sourceDelete", (payload) => {
+      if (!requireDm(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map || !map.lighting || !Array.isArray(map.lighting.sources)) {
+        return;
+      }
+      const sourceId = String((payload && payload.sourceId) || "");
+      const index = map.lighting.sources.findIndex((entry) => entry.id === sourceId);
+      if (index < 0) {
+        return;
+      }
+      map.lighting.sources.splice(index, 1);
       map.updatedAt = nowIso();
       campaign.updatedAt = nowIso();
       persistence.saveSoon();
@@ -3324,6 +3540,7 @@ function createTabletopSystem(io, options = {}) {
         initiativeMod: Number.parseInt(payload && payload.initiativeMod, 10) || 0,
         autoMove: Boolean(payload && payload.autoMove),
         autoMoveType: String((payload && payload.autoMoveType) || "wander"),
+        vision: normalizeTokenVisionConfig(payload && payload.vision),
       };
 
       if (token.sourceType === "character") {
@@ -3386,6 +3603,12 @@ function createTabletopSystem(io, options = {}) {
       }
       if (payload.initiativeMod !== undefined) {
         token.initiativeMod = Number.parseInt(payload.initiativeMod, 10) || 0;
+      }
+      if (payload.vision !== undefined) {
+        token.vision = normalizeTokenVisionConfig({
+          ...(token.vision && typeof token.vision === "object" ? token.vision : {}),
+          ...(payload.vision && typeof payload.vision === "object" ? payload.vision : {}),
+        });
       }
       map.updatedAt = nowIso();
       persistence.saveSoon();
