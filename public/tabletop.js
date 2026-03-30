@@ -495,6 +495,30 @@
     return activeInteractionMode() === "lighting";
   }
 
+  function isTokenInteractionAllowed() {
+    if (!isAuthenticated()) {
+      return false;
+    }
+    if (isPlaceModeActive()) {
+      return false;
+    }
+    if (isDm()) {
+      return state.activeMenu !== "terrain" && state.activeMenu !== "lighting";
+    }
+    return true;
+  }
+
+  function canStartMeasureDrag(event) {
+    return Boolean(
+      event &&
+      event.altKey &&
+      !isPlaceModeActive() &&
+      !isPaintModeActive() &&
+      !isLightingModeActive() &&
+      isToolInteractionEnabled()
+    );
+  }
+
   function setInteractionMode(mode) {
     if (mode === "paint") {
       setActiveMenu("terrain");
@@ -788,6 +812,46 @@
       }
     }
     return null;
+  }
+
+  function terrainBlockerFlagsAt(x, y, map = activeMap()) {
+    const flags = {
+      movement: false,
+      vision: false,
+      light: false,
+    };
+    const layers = terrainLayers(map);
+    for (let index = layers.length - 1; index >= 0; index -= 1) {
+      const layer = layers[index];
+      if (!layer || layer.visible === false || layer.type !== "foreground") {
+        continue;
+      }
+      const tile = getLayerCell(layer, x, y);
+      if (!tile) {
+        continue;
+      }
+      if (tile.kind === "door") {
+        if (!tile.doorOpen) {
+          if (tile.blocksMovement !== false) {
+            flags.movement = true;
+          }
+          if (tile.blocksVision !== false) {
+            flags.vision = true;
+          }
+          if (tile.blocksLight !== false) {
+            flags.light = true;
+          }
+        }
+      } else {
+        flags.movement = flags.movement || tile.blocksMovement === true;
+        flags.vision = flags.vision || tile.blocksVision === true;
+        flags.light = flags.light || tile.blocksLight === true;
+      }
+      if (flags.movement && flags.vision && flags.light) {
+        break;
+      }
+    }
+    return flags;
   }
 
   function currentTerrainBrushTile(layer = selectedTerrainLayer()) {
@@ -1226,9 +1290,10 @@
   }
 
   function beginDragSelect(event) {
-    if (!activeMap() || state.activeMenu !== "tokens" || isPaintModeActive() || isPlaceModeActive()) {
+    if (!activeMap() || !isTokenInteractionAllowed() || isPaintModeActive() || isPlaceModeActive()) {
       return;
     }
+    state.lightingUi.tokenInfoTokenId = null;
     state.dragSelect.active = true;
     state.dragSelect.startClientX = event.clientX;
     state.dragSelect.startClientY = event.clientY;
@@ -1491,6 +1556,7 @@
     state.tool.cellSize = cellSize;
     state.tool.preview = buildPreviewFromDrag(state.tool.start, state.tool.end, cellSize);
     state.suppressCellClickUntil = Date.now() + 250;
+    updateInteractionModeUi();
   }
 
   function updateMeasureDrag(x, y, cellSize) {
@@ -1508,6 +1574,7 @@
       return;
     }
     state.tool.dragging = false;
+    updateInteractionModeUi();
     renderMeasurementOverlay();
   }
 
@@ -1528,6 +1595,7 @@
     state.tool.start = null;
     state.tool.end = null;
     state.tool.preview = null;
+    updateInteractionModeUi();
   }
 
   function commitPreviewDrawing() {
@@ -2397,6 +2465,9 @@
       resetMapInteractionMode();
     }
     applyMenuVisibility();
+    if (state.snapshot) {
+      renderMapGrid();
+    }
   }
 
   function applyMenuVisibility() {
@@ -3333,7 +3404,7 @@
       return;
     }
     const paintMode = isPaintModeActive();
-    const toolMode = isToolInteractionEnabled();
+    const toolMode = isToolInteractionEnabled() && state.tool.dragging;
     elements.mapGridWrap.classList.toggle("tt-mode-paint", paintMode);
     elements.mapGridWrap.classList.toggle("tt-mode-measure", toolMode);
     if (elements.brushPanel) {
@@ -3401,29 +3472,14 @@
     if (!isDm()) {
       return;
     }
-    const selectedSource = selectedLightingSource();
-    if (selectedSource) {
-      emit("lighting:sourceUpdate", {
-        sourceId: selectedSource.id,
-        x,
-        y,
-        ...lightingSourceFormPayload(),
-      });
-      state.lightingUi.pendingPlacement = null;
-      setStatus(`Moved ${selectedSource.name}.`);
-      return;
-    }
-    if (!state.lightingUi.pendingPlacement) {
-      setStatus("Arm a light placement first.", true);
-      return;
-    }
+    const payload = lightingSourceFormPayload();
     emit("lighting:sourceCreate", {
       x,
       y,
-      ...state.lightingUi.pendingPlacement,
+      ...payload,
     });
-    setStatus(`Placed ${state.lightingUi.pendingPlacement.name}.`);
-    state.lightingUi.pendingPlacement = null;
+    state.lightingUi.pendingPlacement = payload;
+    setStatus(`Placed ${payload.name}.`);
   }
 
   function placeTokenAt(x, y, placement) {
@@ -3455,18 +3511,33 @@
       renderMeasurementOverlay();
     }
 
+    const hadTokenInfo = Boolean(state.lightingUi.tokenInfoTokenId);
+    state.lightingUi.tokenInfoTokenId = null;
+
     const mode = activeInteractionMode();
 
     if (isDm() && mode === "paint") {
+      if (hadTokenInfo) {
+        renderTokenPanel();
+        renderMapGrid();
+      }
       return;
     }
 
     if (mode === "lighting") {
+      if (hadTokenInfo) {
+        renderTokenPanel();
+        renderMapGrid();
+      }
       handleLightingCellClick(x, y);
       return;
     }
 
     if (mode === "place") {
+      if (hadTokenInfo) {
+        renderTokenPanel();
+        renderMapGrid();
+      }
       if (!state.selectedPlacement) {
         setStatus("Select a token source first.", true);
         return;
@@ -3475,24 +3546,42 @@
       return;
     }
 
-    if (state.activeMenu !== "tokens") {
+    if (!isTokenInteractionAllowed()) {
+      if (hadTokenInfo) {
+        renderTokenPanel();
+        renderMapGrid();
+      }
       return;
     }
 
     if (state.selectedTokenIds.size === 1) {
       const tokenId = [...state.selectedTokenIds][0];
+      if (hadTokenInfo) {
+        renderTokenPanel();
+        renderMapGrid();
+      }
       emit("token:move", { tokenId, x, y });
       return;
     }
 
     const topCell = topTerrainCellAt(x, y);
     if (state.selectedTokenIds.size === 0 && topCell && topCell.tile && topCell.tile.kind === "door") {
+      if (hadTokenInfo) {
+        renderTokenPanel();
+        renderMapGrid();
+      }
       emit("map:interactDoor", { x, y });
     }
 
     if (state.selectedTokenIds.size > 1) {
       state.selectedTokenIds.clear();
       renderSelectedTokenControls();
+      renderMapGrid();
+      return;
+    }
+
+    if (hadTokenInfo) {
+      renderTokenPanel();
       renderMapGrid();
     }
   }
@@ -3732,12 +3821,12 @@
     const light = new Uint8Array(total);
     for (let y = 0; y < map.rows; y += 1) {
       for (let x = 0; x < map.cols; x += 1) {
-        const component = topTerrainCellAt(x, y, map);
         const index = mapCellIndex(map, x, y);
-        if (isTerrainComponentBlockingVision(component)) {
+        const blockers = terrainBlockerFlagsAt(x, y, map);
+        if (blockers.vision) {
           vision[index] = 1;
         }
-        if (isTerrainComponentBlockingLight(component)) {
+        if (blockers.light) {
           light[index] = 1;
         }
       }
@@ -3747,86 +3836,72 @@
     return state.lightingUi.blockerCache;
   }
 
-  function computeFieldOfView(map, originX, originY, radiusSquares, blockers) {
-    const visible = new Uint8Array(map.rows * map.cols);
-    if (originX < 0 || originY < 0 || originX >= map.cols || originY >= map.rows) {
-      return visible;
+  function hasLineOfSight(map, originX, originY, targetX, targetY, blockers) {
+    if (
+      originX < 0 ||
+      originY < 0 ||
+      originX >= map.cols ||
+      originY >= map.rows ||
+      targetX < 0 ||
+      targetY < 0 ||
+      targetX >= map.cols ||
+      targetY >= map.rows
+    ) {
+      return false;
     }
-    const radius = Math.max(0, Math.ceil(radiusSquares));
-    const radiusSq = radiusSquares * radiusSquares;
-    const setVisible = (x, y) => {
-      if (x < 0 || y < 0 || x >= map.cols || y >= map.rows) {
-        return;
+    if (originX === targetX && originY === targetY) {
+      return true;
+    }
+
+    const dx = targetX - originX;
+    const dy = targetY - originY;
+    const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
+    const stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    let x = originX;
+    let y = originY;
+    let traversedX = 0;
+    let traversedY = 0;
+
+    const blocks = (cellX, cellY) => {
+      if (cellX === targetX && cellY === targetY) {
+        return false;
       }
-      visible[mapCellIndex(map, x, y)] = 1;
+      return blockers[mapCellIndex(map, cellX, cellY)] === 1;
     };
-    const blocks = (x, y) => {
-      if (x < 0 || y < 0 || x >= map.cols || y >= map.rows) {
+
+    while (traversedX < absDx || traversedY < absDy) {
+      const decision = (1 + 2 * traversedX) * absDy - (1 + 2 * traversedY) * absDx;
+      if (decision === 0) {
+        if (
+          (stepX !== 0 && blocks(x + stepX, y)) ||
+          (stepY !== 0 && blocks(x, y + stepY))
+        ) {
+          return false;
+        }
+        x += stepX;
+        y += stepY;
+        traversedX += 1;
+        traversedY += 1;
+      } else if (decision < 0) {
+        x += stepX;
+        traversedX += 1;
+      } else {
+        y += stepY;
+        traversedY += 1;
+      }
+
+      if (x === targetX && y === targetY) {
         return true;
       }
-      return blockers[mapCellIndex(map, x, y)] === 1;
-    };
-
-    setVisible(originX, originY);
-    if (radius <= 0) {
-      return visible;
+      if (blocks(x, y)) {
+        return false;
+      }
     }
 
-    const castLight = (row, start, end, xx, xy, yx, yy) => {
-      if (start < end) {
-        return;
-      }
-      let nextStart = start;
-      for (let distance = row; distance <= radius; distance += 1) {
-        let blocked = false;
-        for (let deltaX = -distance, deltaY = -distance; deltaX <= 0; deltaX += 1) {
-          const leftSlope = (deltaX - 0.5) / (deltaY + 0.5);
-          const rightSlope = (deltaX + 0.5) / (deltaY - 0.5);
-          if (start < rightSlope) {
-            continue;
-          }
-          if (end > leftSlope) {
-            break;
-          }
-
-          const offsetX = deltaX * xx + deltaY * xy;
-          const offsetY = deltaX * yx + deltaY * yy;
-          const x = originX + offsetX;
-          const y = originY + offsetY;
-          const distSq = deltaX * deltaX + deltaY * deltaY;
-          if (x >= 0 && y >= 0 && x < map.cols && y < map.rows && distSq <= radiusSq + 0.0001) {
-            setVisible(x, y);
-          }
-
-          const opaque = blocks(x, y);
-          if (blocked) {
-            if (opaque) {
-              nextStart = rightSlope;
-            } else {
-              blocked = false;
-              start = nextStart;
-            }
-          } else if (opaque && distance < radius) {
-            blocked = true;
-            castLight(distance + 1, start, leftSlope, xx, xy, yx, yy);
-            nextStart = rightSlope;
-          }
-        }
-        if (blocked) {
-          break;
-        }
-      }
-    };
-
-    castLight(1, 1, 0, 1, 0, 0, 1);
-    castLight(1, 1, 0, 0, 1, 1, 0);
-    castLight(1, 1, 0, 0, -1, 1, 0);
-    castLight(1, 1, 0, -1, 0, 0, 1);
-    castLight(1, 1, 0, -1, 0, 0, -1);
-    castLight(1, 1, 0, 0, -1, -1, 0);
-    castLight(1, 1, 0, 0, 1, -1, 0);
-    castLight(1, 1, 0, 1, 0, 0, -1);
-    return visible;
+    return true;
   }
 
   function collectLightSources(map) {
@@ -3871,21 +3946,27 @@
       if (totalRadiusSquares <= 0) {
         return;
       }
-      const visible = computeFieldOfView(map, source.x, source.y, totalRadiusSquares, blockers);
       const brightSq = brightRadiusSquares * brightRadiusSquares;
       const totalSq = totalRadiusSquares * totalRadiusSquares;
-      for (let y = 0; y < map.rows; y += 1) {
-        for (let x = 0; x < map.cols; x += 1) {
-          const index = mapCellIndex(map, x, y);
-          if (!visible[index]) {
-            continue;
-          }
+      const minX = Math.max(0, Math.floor(source.x - totalRadiusSquares));
+      const maxX = Math.min(map.cols - 1, Math.ceil(source.x + totalRadiusSquares));
+      const minY = Math.max(0, Math.floor(source.y - totalRadiusSquares));
+      const maxY = Math.min(map.rows - 1, Math.ceil(source.y + totalRadiusSquares));
+      for (let y = minY; y <= maxY; y += 1) {
+        for (let x = minX; x <= maxX; x += 1) {
           const dx = x - source.x;
           const dy = y - source.y;
           const distSq = dx * dx + dy * dy;
+          if (distSq > totalSq + 0.0001) {
+            continue;
+          }
+          if (!hasLineOfSight(map, source.x, source.y, x, y, blockers)) {
+            continue;
+          }
+          const index = mapCellIndex(map, x, y);
           if (brightRadiusSquares > 0 && distSq <= brightSq + 0.0001) {
             illumination[index] = 2;
-          } else if (distSq <= totalSq + 0.0001) {
+          } else {
             illumination[index] = Math.max(illumination[index], 1);
           }
         }
@@ -3919,23 +4000,20 @@
       return { cells: visible, illumination };
     }
 
-    const maxRadiusSquares = Math.ceil(Math.hypot(map.rows, map.cols));
     const feetPerCell = feetPerSquare(map);
 
     viewerTokens.forEach((token) => {
       const vision = normalizeTokenVisionConfig(token.vision);
-      const sight = computeFieldOfView(map, token.x, token.y, maxRadiusSquares, blockers.vision);
-      const lightSight = computeFieldOfView(map, token.x, token.y, maxRadiusSquares, blockers.light);
       const darkvisionSquares = vision.darkvisionRadius / feetPerCell;
       const darkvisionSq = darkvisionSquares * darkvisionSquares;
 
       for (let y = 0; y < map.rows; y += 1) {
         for (let x = 0; x < map.cols; x += 1) {
           const index = mapCellIndex(map, x, y);
-          if (!sight[index]) {
+          if (!hasLineOfSight(map, token.x, token.y, x, y, blockers.vision)) {
             continue;
           }
-          if (illumination[index] > 0 && lightSight[index]) {
+          if (illumination[index] > 0 && hasLineOfSight(map, token.x, token.y, x, y, blockers.light)) {
             visible[index] = Math.max(visible[index], illumination[index] === 2 ? 3 : 2);
             continue;
           }
@@ -4013,7 +4091,7 @@
           context.fillRect(left, top, cellSize, cellSize);
           continue;
         }
-        context.fillStyle = "rgba(2, 4, 4, 0.94)";
+        context.fillStyle = "rgba(0, 0, 0, 1)";
         context.fillRect(left, top, cellSize, cellSize);
       }
     }
@@ -4148,18 +4226,13 @@
           if (isLightingModeActive()) {
             return;
           }
-          if (!isPlaceModeActive() && isToolInteractionEnabled()) {
+          if (canStartMeasureDrag(event)) {
             event.preventDefault();
             beginMeasureDrag(x, y, cellSize);
             renderMeasurementOverlay();
             return;
           }
-          if (
-            state.activeMenu === "tokens" &&
-            !isPaintModeActive() &&
-            !isPlaceModeActive() &&
-            !isToolInteractionEnabled()
-          ) {
+          if (isTokenInteractionAllowed()) {
             event.preventDefault();
             beginDragSelect(event);
           }
@@ -4221,6 +4294,8 @@
       holder.style.width = `${cellSize}px`;
       holder.style.height = `${cellSize}px`;
       holder.style.position = "relative";
+      const canClickToken = isVisibleToViewer && canCurrentUserInspectToken(token) && isTokenInteractionAllowed();
+      holder.style.pointerEvents = canClickToken ? "auto" : "none";
 
       if (tokenVision.auraRadius > 0 && isVisibleToViewer) {
         const aura = document.createElement("div");
@@ -4275,8 +4350,15 @@
         tokenEl.appendChild(moveEl);
       }
 
+      tokenEl.addEventListener("mousedown", (event) => {
+        if (event.button !== 0 || !isTokenInteractionAllowed() || canStartMeasureDrag(event)) {
+          return;
+        }
+        beginDragSelect(event);
+      });
+
       tokenEl.addEventListener("click", (event) => {
-        if ((isToolInteractionEnabled() && state.tool.dragging) || isPaintModeActive()) {
+        if ((isToolInteractionEnabled() && state.tool.dragging) || isPaintModeActive() || !isTokenInteractionAllowed()) {
           return;
         }
         event.preventDefault();
@@ -4284,11 +4366,9 @@
         if (!canCurrentUserInspectToken(token)) {
           return;
         }
+        closeTokenInfoModal();
         state.lightingUi.tokenInfoTokenId = token.id;
-        if (state.activeMenu !== "tokens") {
-          openTokenInfoModal(token);
-        }
-        if (state.activeMenu === "tokens" && canCurrentUserControlToken(token)) {
+        if (canCurrentUserControlToken(token)) {
           if (event.shiftKey) {
             if (state.selectedTokenIds.has(token.id)) {
               state.selectedTokenIds.delete(token.id);
@@ -4305,13 +4385,19 @@
           }
           renderTokenPanel();
           renderMapGrid();
-        } else if (state.activeMenu === "tokens") {
+        } else {
           renderTokenPanel();
+          renderMapGrid();
         }
       });
 
       tokenEl.addEventListener("dblclick", (event) => {
-        if (!isDm() || token.sourceType !== "character" || !token.ownerUserId) {
+        if (
+          !isDm() ||
+          !isTokenInteractionAllowed() ||
+          token.sourceType !== "character" ||
+          !token.ownerUserId
+        ) {
           return;
         }
         event.preventDefault();
@@ -4319,10 +4405,8 @@
         openTokenConfigModal(token);
       });
 
-      if (canCurrentUserControlToken(token)) {
-        tokenEl.title = state.activeMenu === "tokens"
-          ? "Click for info and selection, then click a destination tile to move."
-          : "Click for token info.";
+      if (canCurrentUserControlToken(token) && isTokenInteractionAllowed()) {
+        tokenEl.title = "Click for info and selection, then click a destination tile to move.";
       } else if (canCurrentUserInspectToken(token)) {
         tokenEl.title = "Click for token info.";
       } else {
@@ -4358,6 +4442,28 @@
             setStatus("Could not read dropped token.", true);
           }
         });
+      }
+
+      if (state.lightingUi.tokenInfoTokenId === token.id && isVisibleToViewer && canCurrentUserInspectToken(token)) {
+        const pairs = tokenInfoPairs(token).slice(0, 4);
+        if (pairs.length > 0) {
+          const popover = document.createElement("div");
+          popover.className = "tt-token-popover";
+          pairs.forEach((pair) => {
+            const row = document.createElement("div");
+            row.className = "tt-token-popover-row";
+            const key = document.createElement("span");
+            key.className = "tt-token-popover-key";
+            key.textContent = pair.key;
+            row.appendChild(key);
+            const value = document.createElement("span");
+            value.className = "tt-token-popover-value";
+            value.textContent = String(pair.value);
+            row.appendChild(value);
+            popover.appendChild(row);
+          });
+          holder.appendChild(popover);
+        }
       }
 
       holder.appendChild(tokenEl);
@@ -5824,12 +5930,14 @@
   if (elements.lightingSourceArm) {
     elements.lightingSourceArm.addEventListener("click", () => {
       state.lightingUi.selectedSourceId = null;
+      state.lightingUi.pendingPlacement = null;
       if (elements.lightingSourceId) {
         elements.lightingSourceId.value = "";
       }
-      state.lightingUi.pendingPlacement = lightingSourceFormPayload();
+      renderLightingEditor();
+      renderMapGrid();
       setActiveMenu("lighting");
-      setStatus(`Armed ${state.lightingUi.pendingPlacement.name} for placement.`);
+      setStatus("Click the map to keep placing light sources with the current form settings.");
     });
   }
   if (elements.lightingSourceSave) {

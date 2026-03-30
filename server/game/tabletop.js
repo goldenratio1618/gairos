@@ -1078,6 +1078,28 @@ function getTerrainCell(map, x, y) {
   return getTopTerrainComponent(map, x, y);
 }
 
+function isMovementBlockedAt(map, x, y) {
+  if (!map || x < 0 || y < 0 || x >= map.cols || y >= map.rows) {
+    return true;
+  }
+  const layers = Array.isArray(map.terrainLayers) ? map.terrainLayers : [];
+  for (let index = layers.length - 1; index >= 0; index -= 1) {
+    const layer = layers[index];
+    if (!layer || layer.visible === false || layer.type !== "foreground" || !Array.isArray(layer.cells)) {
+      continue;
+    }
+    const row = layer.cells[y];
+    const tile = Array.isArray(row) ? row[x] || null : null;
+    if (!tile) {
+      continue;
+    }
+    if (isTileBlockingMovement({ layerType: layer.type, tile })) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function findTokenById(map, tokenId) {
   if (!map || !Array.isArray(map.tokens)) {
     return null;
@@ -1137,8 +1159,7 @@ function computePathAndCost(map, token, targetX, targetY) {
       if (nx < 0 || ny < 0 || nx >= map.cols || ny >= map.rows) {
         continue;
       }
-      const cell = getTerrainCell(map, nx, ny);
-      if (isTileBlockingMovement(cell)) {
+      if (isMovementBlockedAt(map, nx, ny)) {
         continue;
       }
 
@@ -3635,7 +3656,7 @@ function createTabletopSystem(io, options = {}) {
     });
 
     socket.on("token:delete", (payload) => {
-      if (!requireDm(socket)) {
+      if (!requireAuth(socket)) {
         return;
       }
       const campaign = ensureSocketCampaign(socket);
@@ -3646,6 +3667,11 @@ function createTabletopSystem(io, options = {}) {
       const tokenId = String((payload && payload.tokenId) || "");
       const index = map.tokens.findIndex((token) => token.id === tokenId);
       if (index < 0) {
+        return;
+      }
+      const token = map.tokens[index];
+      if (!canControlToken(socket, campaign, token)) {
+        socket.emit("tabletop:error", { message: "You cannot delete this token." });
         return;
       }
       const [removed] = map.tokens.splice(index, 1);
@@ -3683,20 +3709,23 @@ function createTabletopSystem(io, options = {}) {
       }
 
       const targetCell = getTerrainCell(map, targetX, targetY);
-      if (isTileBlockingMovement(targetCell)) {
-        socket.emit("tabletop:error", { message: "That tile blocks movement." });
-        return;
-      }
+      const role = roleForUserInCampaign(socket.data.user, campaign);
+      if (role !== "dm") {
+        if (isMovementBlockedAt(map, targetX, targetY)) {
+          socket.emit("tabletop:error", { message: "That tile blocks movement." });
+          return;
+        }
 
-      const path = computePathAndCost(map, token, targetX, targetY);
-      if (!path) {
-        socket.emit("tabletop:error", { message: "No path to that tile." });
-        return;
+        const path = computePathAndCost(map, token, targetX, targetY);
+        if (!path) {
+          socket.emit("tabletop:error", { message: "No path to that tile." });
+          return;
+        }
+        updateMovementTracking(campaign, map, token, path.cost);
       }
 
       token.x = targetX;
       token.y = targetY;
-      updateMovementTracking(campaign, map, token, path.cost);
       applyScenarioTileEffects(campaign, map, token, targetCell);
       map.updatedAt = nowIso();
       persistence.saveSoon();
@@ -4262,8 +4291,7 @@ function createTabletopSystem(io, options = {}) {
         directions.forEach((direction) => {
           const nx = token.x + direction.dx;
           const ny = token.y + direction.dy;
-          const cell = getTerrainCell(map, nx, ny);
-          if (isTileBlockingMovement(cell)) {
+          if (isMovementBlockedAt(map, nx, ny)) {
             return;
           }
           candidates.push({ x: nx, y: ny });
