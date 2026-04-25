@@ -14,6 +14,13 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function normalizeTerrainLayerType(type) {
+  if (type === "foreground" || type === "gm") {
+    return type;
+  }
+  return "background";
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -225,8 +232,8 @@ function createBaseTile(tile, layerType, textureCatalog) {
     return null;
   }
 
-  const normalizedLayerType = layerType === "foreground" ? "foreground" : "background";
-  const kind = ["texture", "color", "door"].includes(tile.kind) ? tile.kind : "texture";
+  const normalizedLayerType = normalizeTerrainLayerType(layerType);
+  const kind = ["texture", "color", "door", "text"].includes(tile.kind) ? tile.kind : "texture";
   const alpha = clamp(Number.parseFloat(tile.alpha), 0, 1);
   const safeAlpha = Number.isFinite(alpha) ? alpha : 1;
 
@@ -255,6 +262,22 @@ function createBaseTile(tile, layerType, textureCatalog) {
       blocksMovement: normalizedLayerType === "foreground" ? tile.blocksMovement !== false : false,
       blocksVision: normalizedLayerType === "foreground" ? tile.blocksVision !== false : false,
       blocksLight: normalizedLayerType === "foreground" ? tile.blocksLight !== false : false,
+    };
+  }
+
+  if (kind === "text") {
+    const text = String(tile.text || "").trim().slice(0, 24);
+    if (!text) {
+      return null;
+    }
+    return {
+      kind: "text",
+      text,
+      color: sanitizeHexColor(tile.color, "#f3e7b3"),
+      alpha: safeAlpha,
+      blocksMovement: false,
+      blocksVision: false,
+      blocksLight: false,
     };
   }
 
@@ -299,10 +322,12 @@ function resizeLayerGrid(cells, rows, cols, layerType, textureCatalog) {
 }
 
 function createTerrainLayer({ createId, name, type, rows, cols, fillTile = null }) {
-  const layerType = type === "foreground" ? "foreground" : "background";
+  const layerType = normalizeTerrainLayerType(type);
+  const defaultName =
+    layerType === "foreground" ? "Foreground" : layerType === "gm" ? "GM" : "Background";
   return {
     id: createId("terrain_layer"),
-    name: String(name || (layerType === "background" ? "Background" : "Foreground")).slice(0, 60),
+    name: String(name || defaultName).slice(0, 60),
     type: layerType,
     visible: true,
     backgroundImageDataUrl: "",
@@ -345,12 +370,11 @@ function createDefaultTerrainLayers({ createId, rows, cols, textureCatalog }) {
 }
 
 function normalizeTerrainLayer(layer, rows, cols, textureCatalog, createId) {
-  const type = layer && layer.type === "foreground" ? "foreground" : "background";
+  const type = normalizeTerrainLayerType(layer && layer.type);
+  const defaultName = type === "foreground" ? "Foreground" : type === "gm" ? "GM" : "Background";
   return {
     id: String((layer && layer.id) || createId("terrain_layer")),
-    name: String(
-      (layer && layer.name) || (type === "background" ? "Background" : "Foreground")
-    ).slice(0, 60),
+    name: String((layer && layer.name) || defaultName).slice(0, 60),
     type,
     visible: layer && layer.visible !== false,
     backgroundImageDataUrl:
@@ -512,6 +536,7 @@ function cloneVisibleMapForRole(map, role) {
   if (role === "dm") {
     return cloned;
   }
+  cloned.terrainLayers = getTerrainLayers(cloned).filter((layer) => layer.type !== "gm");
   getTerrainLayers(cloned).forEach((layer) => {
     layer.cells = (Array.isArray(layer.cells) ? layer.cells : []).map((row) =>
       (Array.isArray(row) ? row : []).map((tile) => {
@@ -528,7 +553,8 @@ function cloneVisibleMapForRole(map, role) {
 }
 
 function nextLayerName(map, type) {
-  const safeType = type === "foreground" ? "Foreground" : "Background";
+  const safeType =
+    type === "foreground" ? "Foreground" : type === "gm" ? "GM" : "Background";
   const existing = new Set(getTerrainLayers(map).map((layer) => String(layer.name || "").toLowerCase()));
   if (!existing.has(safeType.toLowerCase())) {
     return safeType;
@@ -545,7 +571,7 @@ function nextLayerName(map, type) {
 }
 
 function createLayerOnMap(map, type, createId, textureCatalog) {
-  const layerType = type === "foreground" ? "foreground" : "background";
+  const layerType = normalizeTerrainLayerType(type);
   const layer = createTerrainLayer({
     createId,
     name: nextLayerName(map, layerType),
@@ -564,8 +590,9 @@ function deleteLayerFromMap(map, layerId) {
     return { ok: false, reason: "Layer not found." };
   }
   const target = layers[targetIndex];
+  const needsOneRemaining = target.type === "background" || target.type === "foreground";
   const sameTypeCount = layers.filter((layer) => layer.type === target.type).length;
-  if (sameTypeCount <= 1) {
+  if (needsOneRemaining && sameTypeCount <= 1) {
     return { ok: false, reason: `At least one ${target.type} layer must remain.` };
   }
   layers.splice(targetIndex, 1);
@@ -624,21 +651,24 @@ function applyTerrainOps(map, layerId, ops, textureCatalog) {
 }
 
 function findDoorComponentAt(map, x, y) {
-  const component = getTopTerrainComponent(map, x, y);
-  if (!component || !component.tile || component.tile.kind !== "door") {
-    return null;
+  const layers = getTerrainLayers(map);
+  for (let index = layers.length - 1; index >= 0; index -= 1) {
+    const layer = layers[index];
+    if (!layer || layer.visible === false || layer.type !== "foreground") {
+      continue;
+    }
+    const tile = getTerrainTile(layer, x, y);
+    if (!tile || tile.kind !== "door") {
+      continue;
+    }
+    return {
+      layer,
+      tile,
+      x,
+      y,
+    };
   }
-  const layer = getTerrainLayerById(map, component.layerId);
-  const tile = layer ? getTerrainTile(layer, x, y) : null;
-  if (!layer || !tile || tile.kind !== "door") {
-    return null;
-  }
-  return {
-    layer,
-    tile,
-    x,
-    y,
-  };
+  return null;
 }
 
 function normalizeCampaignTerrainDefaults(campaign, textureCatalog) {

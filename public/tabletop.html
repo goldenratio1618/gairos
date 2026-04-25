@@ -181,6 +181,7 @@
                 <select id="terrain-layer-new-type">
                   <option value="background">Background Layer</option>
                   <option value="foreground">Foreground Layer</option>
+                  <option value="gm">GM Layer</option>
                 </select>
                 <button id="terrain-layer-new" type="button">Create Layer</button>
               </div>
@@ -194,17 +195,18 @@
             </div>
           </div>
 
-          <div class="tt-mapctrl">
+          <div class="tt-mapctrl tt-mapctrl-split">
             <div class="tt-mapctrl-label">Tool</div>
             <div class="tt-seg-group tt-seg-wrap" id="terrain-tool-group">
               <button type="button" class="tt-seg tt-seg-active" data-value="brush">Brush</button>
-              <button type="button" class="tt-seg" data-value="eraser">Eraser</button>
               <button type="button" class="tt-seg" data-value="bucket">Bucket</button>
               <button type="button" class="tt-seg" data-value="line">Line</button>
               <button type="button" class="tt-seg" data-value="rectangle">Rect</button>
               <button type="button" class="tt-seg" data-value="ellipse">Ellipse</button>
+              <button type="button" class="tt-seg" data-value="text">Text</button>
               <button type="button" class="tt-seg" data-value="door">Door</button>
             </div>
+            <button id="terrain-undo" type="button" class="tt-icon-button" title="Undo terrain edit (Ctrl+Z)">Undo</button>
           </div>
 
           <div class="tt-grid2 tt-terrain-option-grid">
@@ -228,6 +230,13 @@
                 <input id="terrain-shape-filled" type="checkbox" checked />
                 Fill Shapes
               </label>
+            </div>
+          </div>
+
+          <div id="terrain-text-options" class="tt-grid2 tt-terrain-option-grid tt-hidden">
+            <div style="grid-column: 1 / -1;">
+              <label class="tt-field" for="terrain-text-input">Text</label>
+              <input id="terrain-text-input" type="text" maxlength="24" placeholder="Map label" />
             </div>
           </div>
 
@@ -361,7 +370,7 @@
             <select id="roll-skill-select"></select>
             <div class="tt-row">
               <label>Roll Context</label>
-              <div id="roll-type-display" class="tt-inline-value">major_skill</div>
+              <select id="roll-type-select"></select>
             </div>
             <div class="tt-grid2">
               <div>
@@ -467,6 +476,7 @@
           <div class="tt-row">
             <label for="distance-mode">Distance Mode</label>
             <select id="distance-mode">
+              <option value="linf">L-infinity</option>
               <option value="taxicab">Taxicab</option>
               <option value="euclidean">Euclidean</option>
             </select>
@@ -482,6 +492,7 @@
               <option value="gm">GM Layer</option>
             </select>
           </div>
+          <button id="clear-drawings" type="button">Clear my drawings</button>
           <div id="measure-readout" class="tt-inline-value">Distance: -</div>
           <div class="tt-log-meta">Alt-drag on the map to preview. Right-click to convert preview to drawing.</div>
         </section>

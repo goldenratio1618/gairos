@@ -179,6 +179,13 @@ const CLERIC_DICE_MODIFIER_IDS = new Set([
   "portent",
 ]);
 
+const PRAYER_ROLL_TYPES = new Set([
+  "beseech_the_gods",
+  "prepared_prayer",
+  "prayer",
+  "prayer_humility",
+]);
+
 const ITALICIZED_SKILLS = new Set(["dodge", "stealth", "evoke runes"]);
 
 const INJURY_TABLES = {
@@ -877,6 +884,38 @@ function findUsageCounterForModifier(parsedSheet, modifierId, definition) {
   return null;
 }
 
+function getNumericParsedCurrentValue(parsedSheet, key) {
+  const normalizedKey = normalizeSkillName(key);
+  if (!parsedSheet || !normalizedKey) {
+    return null;
+  }
+
+  const meta = parsedSheet.currentValueMeta && typeof parsedSheet.currentValueMeta === "object"
+    ? parsedSheet.currentValueMeta
+    : {};
+  const matchingMetaKey = Object.keys(meta).find((candidate) => normalizeSkillName(candidate) === normalizedKey);
+  if (matchingMetaKey) {
+    const details = meta[matchingMetaKey];
+    if (details && details.hasCurrent && Number.isFinite(Number(details.currentValue))) {
+      return Number(details.currentValue);
+    }
+    if (details && details.hasBase && Number.isFinite(Number(details.baseValue))) {
+      return Number(details.baseValue);
+    }
+  }
+
+  const currentValues = parsedSheet.currentValues && typeof parsedSheet.currentValues === "object"
+    ? parsedSheet.currentValues
+    : {};
+  const matchingValueKey = Object.keys(currentValues).find(
+    (candidate) => normalizeSkillName(candidate) === normalizedKey
+  );
+  if (matchingValueKey && Number.isFinite(Number(currentValues[matchingValueKey]))) {
+    return Number(currentValues[matchingValueKey]);
+  }
+  return null;
+}
+
 function parseStatblockColumn(rows, columnName) {
   const header = rows[0] || [];
   let index = -1;
@@ -1210,6 +1249,35 @@ function computeAvailableModifiers(characterLike) {
     }
   });
   return available;
+}
+
+function modifierAppliesToRoll(definition, rollType, skillName) {
+  if (!definition || !Array.isArray(definition.appliesTo)) {
+    return true;
+  }
+  const appliesTo = definition.appliesTo.map((entry) => String(entry || "").toLowerCase());
+  const normalizedRollType = normalizeSkillName(rollType);
+  const normalizedSkill = normalizeSkillName(skillName);
+
+  if (appliesTo.includes("any")) {
+    return true;
+  }
+  if (appliesTo.includes(normalizedRollType)) {
+    return true;
+  }
+  if (appliesTo.includes(normalizedSkill)) {
+    return true;
+  }
+  if (
+    appliesTo.includes("any_skill") &&
+    (normalizedRollType.includes("skill") || PRAYER_ROLL_TYPES.has(normalizedRollType))
+  ) {
+    return true;
+  }
+  if (appliesTo.includes("beseech_the_gods") && PRAYER_ROLL_TYPES.has(normalizedRollType)) {
+    return true;
+  }
+  return false;
 }
 
 function rollD20WithAdvantageLevel(advantageLevel, extraDice = 0) {
@@ -1670,12 +1738,13 @@ function createPersistence(dataDirectory) {
   };
 }
 
-function createLogEntry({ type, actor, message, details }) {
+function createLogEntry({ type, actor, actorUserId, message, details }) {
   return {
     id: createId("log"),
     timestamp: nowIso(),
     type,
     actor: actor || null,
+    actorUserId: actorUserId || null,
     message: String(message || ""),
     details: details || null,
   };
@@ -1749,6 +1818,24 @@ function sanitizeStatblockForClient(statblock, role) {
     parsedSheet: statblock.parsedSheet || null,
     updatedAt: statblock.updatedAt,
   };
+}
+
+function logVisibleToRole(campaign, entry, role, users = []) {
+  if (!entry) {
+    return false;
+  }
+  if (role === "dm") {
+    return true;
+  }
+  const dmUserId = String((campaign && campaign.dmUserId) || "");
+  if (dmUserId && entry.actorUserId && String(entry.actorUserId) === dmUserId) {
+    return false;
+  }
+  const dmUser = (Array.isArray(users) ? users : []).find((candidate) => candidate.id === dmUserId) || null;
+  if (!entry.actorUserId && dmUser && entry.actor === dmUser.username) {
+    return false;
+  }
+  return true;
 }
 
 function createTabletopSystem(io, options = {}) {
@@ -1983,7 +2070,12 @@ function createTabletopSystem(io, options = {}) {
       statblocks: (campaign && Array.isArray(campaign.statblocks) ? campaign.statblocks : [])
         .map((statblock) => sanitizeStatblockForClient(statblock, role))
         .filter(Boolean),
-      logs: campaign && Array.isArray(campaign.logs) ? campaign.logs.slice(-500) : [],
+      logs:
+        campaign && Array.isArray(campaign.logs)
+          ? campaign.logs
+            .filter((entry) => logVisibleToRole(campaign, entry, role, state.users))
+            .slice(-500)
+          : [],
       herbs: {
         loadedAt: herbsState.loadedAt,
         count: herbsState.herbs.length,
@@ -2065,6 +2157,10 @@ function createTabletopSystem(io, options = {}) {
         actor: actorSocket && actorSocket.data && actorSocket.data.user
           ? actorSocket.data.user.username
           : "system",
+        actorUserId:
+          actorSocket && actorSocket.data && actorSocket.data.user
+            ? actorSocket.data.user.id
+            : null,
         message,
         details,
       })
@@ -2247,6 +2343,14 @@ function createTabletopSystem(io, options = {}) {
         baseBonus = 0;
       }
     }
+    const skillBonusRaw = Number(baseBonus) || 0;
+    const prayerRoll = normalizedSkill === "beseech the gods" && PRAYER_ROLL_TYPES.has(rollType);
+    const divineFavorBonus = prayerRoll ? getNumericParsedCurrentValue(parsed, "divine favor") : null;
+    let baseBonusRaw = skillBonusRaw + (Number.isFinite(divineFavorBonus) ? divineFavorBonus : 0);
+    const humilityApplied = prayerRoll && rollType === "prayer_humility";
+    if (humilityApplied) {
+      baseBonusRaw /= 2;
+    }
 
     const requestedModifiers = Array.isArray(payload.modifiers) ? payload.modifiers : [];
     const approvedIds = Array.isArray(payload.approvalIds) ? payload.approvalIds : [];
@@ -2295,15 +2399,18 @@ function createTabletopSystem(io, options = {}) {
       }
       const modifierId = String(modifier.id);
       const isExternal = Boolean(modifier.external);
+      const definition = definitionById.get(modifierId) || null;
       if (isExternal && !externalModifiersUsed.includes(modifierId)) {
         return { ok: false, error: `Modifier ${modifierId} requires approval.` };
       }
       if (blockClericDiceFeats && CLERIC_DICE_MODIFIER_IDS.has(modifierId)) {
         continue;
       }
+      if (!modifierAppliesToRoll(definition, rollType, normalizedSkill)) {
+        continue;
+      }
 
       if (!isExternal) {
-        const definition = definitionById.get(modifierId);
         if (definition && definition.featNames.length > 0) {
           const hasFeat = definition.featNames.some((feat) => actorFeats.has(normalizeFeatName(feat)));
           if (!hasFeat) {
@@ -2395,7 +2502,6 @@ function createTabletopSystem(io, options = {}) {
       }
     }
 
-    const baseBonusRaw = Number(baseBonus) || 0;
     const maxFofGroups = clamp(Math.floor(Math.max(0, baseBonusRaw) / 10), 0, 12);
     const requestedFofGroups = clamp(Number.parseInt(payload.fortuneOverFinesseGroups, 10) || 0, 0, 12);
     const fofExtraGroups = fortuneOverFinesseEnabled
@@ -2547,6 +2653,10 @@ function createTabletopSystem(io, options = {}) {
         skillName,
         normalizedSkill,
         rollType,
+        prayerApplied: prayerRoll,
+        humilityApplied,
+        skillBonus: skillBonusRaw,
+        divineFavorBonus: Number.isFinite(divineFavorBonus) ? divineFavorBonus : null,
         baseBonus: effectiveBaseBonus,
         baseBonusRaw,
         flatModifier: Number(payload.flatModifier || 0),
@@ -3349,6 +3459,29 @@ function createTabletopSystem(io, options = {}) {
       broadcastSnapshots();
     });
 
+    socket.on("map:clearDrawings", () => {
+      if (!requireAuth(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map || !Array.isArray(map.drawings) || map.drawings.length === 0) {
+        return;
+      }
+      const isDm = roleForUserInCampaign(socket.data.user, campaign) === "dm";
+      const nextDrawings = isDm
+        ? []
+        : map.drawings.filter((drawing) => drawing.ownerUserId !== socket.data.user.id);
+      if (nextDrawings.length === map.drawings.length) {
+        return;
+      }
+      map.drawings = nextDrawings;
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
     socket.on("terrain:setTextureDefault", (payload) => {
       if (!requireDm(socket)) {
         return;
@@ -3383,7 +3516,12 @@ function createTabletopSystem(io, options = {}) {
       if (!map) {
         return;
       }
-      const layerType = payload && payload.type === "foreground" ? "foreground" : "background";
+      const layerType =
+        payload && payload.type === "foreground"
+          ? "foreground"
+          : payload && payload.type === "gm"
+            ? "gm"
+            : "background";
       createLayerOnMap(map, layerType, createId, activeTextureCatalog);
       map.updatedAt = nowIso();
       campaign.updatedAt = nowIso();
@@ -3710,17 +3848,18 @@ function createTabletopSystem(io, options = {}) {
 
       const targetCell = getTerrainCell(map, targetX, targetY);
       const role = roleForUserInCampaign(socket.data.user, campaign);
-      if (role !== "dm") {
-        if (isMovementBlockedAt(map, targetX, targetY)) {
-          socket.emit("tabletop:error", { message: "That tile blocks movement." });
-          return;
-        }
+      if (isMovementBlockedAt(map, targetX, targetY)) {
+        socket.emit("tabletop:error", { message: "That tile blocks movement." });
+        return;
+      }
 
-        const path = computePathAndCost(map, token, targetX, targetY);
-        if (!path) {
-          socket.emit("tabletop:error", { message: "No path to that tile." });
-          return;
-        }
+      const path = computePathAndCost(map, token, targetX, targetY);
+      if (!path) {
+        socket.emit("tabletop:error", { message: "No path to that tile." });
+        return;
+      }
+
+      if (role !== "dm") {
         updateMovementTracking(campaign, map, token, path.cost);
       }
 
@@ -3990,6 +4129,7 @@ function createTabletopSystem(io, options = {}) {
         createLogEntry({
           type: "roll",
           actor: socket.data.user.username,
+          actorUserId: socket.data.user.id,
           message: `${result.actorEntity.name} rolled ${rollData.skillName}: ${rollData.total}${isdcLogText}`,
           details: {
             entityId: result.actorEntity.id,
@@ -4153,6 +4293,7 @@ function createTabletopSystem(io, options = {}) {
         createLogEntry({
           type: "injury",
           actor: socket.data.user.username,
+          actorUserId: socket.data.user.id,
           message: `${entity.name} injury roll: death ${deathPassed ? "saved" : "failed"}, injury ${injuryPassed ? "none" : injuryTier}`,
           details: outcome,
         })
@@ -4202,6 +4343,7 @@ function createTabletopSystem(io, options = {}) {
         createLogEntry({
           type: "forage",
           actor: socket.data.user.username,
+          actorUserId: socket.data.user.id,
           message: `Foraging (${terrain}): ${chosen.name} (${rarity.replace("_", " ")})`,
           details: result,
         })
@@ -4235,6 +4377,7 @@ function createTabletopSystem(io, options = {}) {
           createLogEntry({
             type: "roll",
             actor: socket.data.user.username,
+            actorUserId: socket.data.user.id,
             message: `${socket.data.user.username} rolled ${parsed.notation} = ${parsed.total}`,
             details: parsed,
           })
@@ -4245,6 +4388,7 @@ function createTabletopSystem(io, options = {}) {
           createLogEntry({
             type: "chat",
             actor: socket.data.user.username,
+            actorUserId: socket.data.user.id,
             message: text,
             details: null,
           })

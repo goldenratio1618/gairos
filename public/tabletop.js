@@ -91,6 +91,7 @@
     mapGmOpacityValue: document.getElementById("map-gm-opacity-value"),
     mapBackgroundInput: document.getElementById("map-background-input"),
     terrainToolGroup: document.getElementById("terrain-tool-group"),
+    terrainUndo: document.getElementById("terrain-undo"),
     terrainActiveLayer: document.getElementById("terrain-active-layer"),
     terrainLayerList: document.getElementById("terrain-layer-list"),
     terrainLayerNewType: document.getElementById("terrain-layer-new-type"),
@@ -100,6 +101,8 @@
     terrainOpacityValue: document.getElementById("terrain-opacity-value"),
     terrainLineWidth: document.getElementById("terrain-line-width"),
     terrainShapeFilled: document.getElementById("terrain-shape-filled"),
+    terrainTextOptions: document.getElementById("terrain-text-options"),
+    terrainTextInput: document.getElementById("terrain-text-input"),
     terrainForegroundOptions: document.getElementById("terrain-foreground-options"),
     terrainBlockMovement: document.getElementById("terrain-block-movement"),
     terrainBlockVision: document.getElementById("terrain-block-vision"),
@@ -145,7 +148,7 @@
     rollForm: document.getElementById("roll-form"),
     rollEntitySelect: document.getElementById("roll-entity-select"),
     rollSkillSelect: document.getElementById("roll-skill-select"),
-    rollTypeDisplay: document.getElementById("roll-type-display"),
+    rollTypeSelect: document.getElementById("roll-type-select"),
     rollAdvantage: document.getElementById("roll-advantage"),
     rollSkillModifier: document.getElementById("roll-skill-modifier"),
     rollTargetDieWrap: document.getElementById("roll-target-die-wrap"),
@@ -182,6 +185,7 @@
     drawingColor: document.getElementById("drawing-color"),
     drawingLayerRow: document.getElementById("drawing-layer-row"),
     drawingLayerSelect: document.getElementById("drawing-layer-select"),
+    clearDrawings: document.getElementById("clear-drawings"),
     measureReadout: document.getElementById("measure-readout"),
 
     injuryEntitySelect: document.getElementById("injury-entity-select"),
@@ -263,9 +267,18 @@
       endClientX: 0,
       endClientY: 0,
     },
+    tokenDrag: {
+      active: false,
+      tokenId: null,
+      startClientX: 0,
+      startClientY: 0,
+      hoverCell: null,
+      dragStarted: false,
+      suppressClickUntil: 0,
+    },
     tool: {
       active: "distance",
-      distanceMode: "taxicab",
+      distanceMode: "linf",
       drawingColor: "#f3c56e",
       dragging: false,
       start: null,
@@ -299,6 +312,7 @@
       lineWidth: 1,
       opacity: 1,
       shapeFilled: true,
+      textValue: "",
       foregroundRules: {
         blocksMovement: true,
         blocksVision: true,
@@ -315,6 +329,8 @@
       textureImages: new Map(),
       textureTileCache: new Map(),
       lockFlash: null,
+      undoStack: [],
+      undoMapId: null,
     },
     lightingUi: {
       selectedSourceId: null,
@@ -403,6 +419,10 @@
       return null;
     }
     return campaigns().find((campaign) => campaign.id === id) || null;
+  }
+
+  function canShowSessionLog() {
+    return isAuthenticated() && Boolean(activeCampaign());
   }
 
   function ownCharacters() {
@@ -707,9 +727,34 @@
     return state.terrain.activeTool || "brush";
   }
 
+  function terrainLayerTypeLabel(type) {
+    if (type === "foreground") {
+      return "Foreground";
+    }
+    if (type === "gm") {
+      return "GM";
+    }
+    return "Background";
+  }
+
+  function isTerrainEraseBrush() {
+    return state.terrain.brush.kind === "erase";
+  }
+
   function normalizeTerrainColor(value) {
     const text = String(value || "").trim();
     return /^#[0-9a-f]{6}$/i.test(text) ? text : "#7f8c4a";
+  }
+
+  function sanitizeTerrainText(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 24);
+  }
+
+  function terrainTextColor() {
+    return normalizeTerrainColor(state.terrain.brush.color || "#f3e7b3");
   }
 
   function updateTerrainOpacityLabel() {
@@ -724,19 +769,26 @@
     const layer = ensureActiveTerrainLayer();
     const isForeground = Boolean(layer && layer.type === "foreground");
     const showDoorOptions = isForeground && selectedTerrainTool() === "door";
+    const showTextOptions = selectedTerrainTool() === "text";
     if (elements.terrainForegroundOptions) {
       elements.terrainForegroundOptions.classList.toggle("tt-hidden", !isForeground);
     }
     if (elements.terrainDoorOptions) {
       elements.terrainDoorOptions.classList.toggle("tt-hidden", !showDoorOptions);
     }
+    if (elements.terrainTextOptions) {
+      elements.terrainTextOptions.classList.toggle("tt-hidden", !showTextOptions);
+    }
     if (elements.mapBackgroundInput) {
       elements.mapBackgroundInput.disabled = !(layer && layer.type === "background");
+    }
+    if (elements.terrainUndo) {
+      elements.terrainUndo.disabled = !(isDm() && state.activeMenu === "terrain" && state.terrain.undoStack.length > 0);
     }
   }
 
   function setTerrainTool(toolKey) {
-    const normalized = ["brush", "eraser", "bucket", "line", "rectangle", "ellipse", "door"].includes(toolKey)
+    const normalized = ["brush", "bucket", "line", "rectangle", "ellipse", "text", "door"].includes(toolKey)
       ? toolKey
       : "brush";
     state.terrain.activeTool = normalized;
@@ -753,7 +805,14 @@
 
   function setTerrainBrushSelection(selection) {
     const next = selection && typeof selection === "object" ? selection : {};
-    if (next.kind === "color") {
+    if (next.kind === "erase") {
+      state.terrain.brush = {
+        kind: "erase",
+        color: state.terrain.brush.color || "#7f8c4a",
+        textureId: "",
+        categoryId: "",
+      };
+    } else if (next.kind === "color") {
       state.terrain.brush = {
         kind: "color",
         color: normalizeTerrainColor(next.color || state.terrain.brush.color),
@@ -814,6 +873,21 @@
     return null;
   }
 
+  function topDoorTerrainCellAt(x, y, map = activeMap()) {
+    const layers = terrainLayers(map);
+    for (let index = layers.length - 1; index >= 0; index -= 1) {
+      const layer = layers[index];
+      if (!layer || layer.visible === false || layer.type !== "foreground") {
+        continue;
+      }
+      const tile = getLayerCell(layer, x, y);
+      if (tile && tile.kind === "door") {
+        return { layer, tile };
+      }
+    }
+    return null;
+  }
+
   function terrainBlockerFlagsAt(x, y, map = activeMap()) {
     const flags = {
       movement: false,
@@ -854,15 +928,20 @@
     return flags;
   }
 
+  function terrainToolUsesBrushTile(toolKey = selectedTerrainTool()) {
+    return ["brush", "bucket", "line", "rectangle", "ellipse"].includes(toolKey);
+  }
+
   function currentTerrainBrushTile(layer = selectedTerrainLayer()) {
     if (!layer) {
       return null;
     }
+    const tool = selectedTerrainTool();
     const opacity = clamp(Number(state.terrain.opacity) || 1, 0.05, 1);
-    if (selectedTerrainTool() === "eraser") {
+    if (terrainToolUsesBrushTile(tool) && isTerrainEraseBrush()) {
       return null;
     }
-    if (selectedTerrainTool() === "door") {
+    if (tool === "door") {
       if (layer.type !== "foreground") {
         return null;
       }
@@ -879,6 +958,21 @@
         blocksLight: Boolean(state.terrain.foregroundRules.blocksLight),
         doorLocked: state.terrain.doorState === "locked",
         doorOpen: state.terrain.doorState === "open",
+      };
+    }
+    if (tool === "text") {
+      const text = sanitizeTerrainText(state.terrain.textValue);
+      if (!text) {
+        return null;
+      }
+      return {
+        kind: "text",
+        text,
+        color: terrainTextColor(),
+        alpha: opacity,
+        blocksMovement: false,
+        blocksVision: false,
+        blocksLight: false,
       };
     }
     const base = {
@@ -1070,6 +1164,119 @@
     scheduleTerrainCanvasRender();
   }
 
+  function normalizeTerrainHistoryChanges(layer, changes) {
+    if (!layer || !Array.isArray(changes)) {
+      return [];
+    }
+    const normalized = [];
+    changes.forEach((change) => {
+      const before = cloneTerrainTile(getLayerCell(layer, change.x, change.y));
+      const after = cloneTerrainTile(change.tile);
+      if (tileFingerprint(before) === tileFingerprint(after)) {
+        return;
+      }
+      normalized.push({
+        x: change.x,
+        y: change.y,
+        before,
+        after,
+      });
+    });
+    return normalized;
+  }
+
+  function recordTerrainStrokeChunk(stroke, layer, changes) {
+    if (!stroke || !layer) {
+      return [];
+    }
+    const normalized = normalizeTerrainHistoryChanges(layer, changes);
+    if (!stroke.historyChanges) {
+      stroke.historyChanges = new Map();
+    }
+    normalized.forEach((change) => {
+      const key = `${change.x},${change.y}`;
+      const existing = stroke.historyChanges.get(key);
+      if (existing) {
+        existing.after = cloneTerrainTile(change.after);
+        if (tileFingerprint(existing.before) === tileFingerprint(existing.after)) {
+          stroke.historyChanges.delete(key);
+        }
+        return;
+      }
+      stroke.historyChanges.set(key, {
+        x: change.x,
+        y: change.y,
+        before: cloneTerrainTile(change.before),
+        after: cloneTerrainTile(change.after),
+      });
+    });
+    return normalized;
+  }
+
+  function pushTerrainUndoEntry(layerId, changes) {
+    const map = activeMap();
+    if (!map || !layerId || !Array.isArray(changes) || changes.length === 0) {
+      return;
+    }
+    state.terrain.undoMapId = map.id || null;
+    state.terrain.undoStack.push({
+      mapId: map.id || null,
+      layerId,
+      changes: changes.map((change) => ({
+        x: change.x,
+        y: change.y,
+        before: cloneTerrainTile(change.before),
+        after: cloneTerrainTile(change.after),
+      })),
+    });
+    if (state.terrain.undoStack.length > 60) {
+      state.terrain.undoStack.splice(0, state.terrain.undoStack.length - 60);
+    }
+    updateTerrainOptionVisibility();
+  }
+
+  function resetTerrainUndoStack() {
+    state.terrain.undoStack = [];
+    state.terrain.undoMapId = activeMap() ? activeMap().id || null : null;
+    updateTerrainOptionVisibility();
+  }
+
+  function syncTerrainUndoContext() {
+    const map = activeMap();
+    const mapId = map ? map.id || null : null;
+    if (state.terrain.undoMapId !== mapId) {
+      resetTerrainUndoStack();
+    }
+  }
+
+  function undoTerrainEdit() {
+    if (!isDm() || state.activeMenu !== "terrain") {
+      return false;
+    }
+    syncTerrainUndoContext();
+    if (state.terrain.undoStack.length === 0) {
+      return false;
+    }
+    stopPaintDrag();
+    flushPendingTerrainChanges();
+    const entry = state.terrain.undoStack.pop();
+    const layer = terrainLayerById(entry && entry.layerId);
+    if (!entry || !layer || !Array.isArray(entry.changes) || entry.changes.length === 0) {
+      updateTerrainOptionVisibility();
+      return false;
+    }
+    const undoOps = entry.changes.map((change) => ({
+      x: change.x,
+      y: change.y,
+      tile: cloneTerrainTile(change.before),
+    }));
+    applyTerrainChangesLocally(entry.layerId, undoOps);
+    emit("terrain:applyOps", { layerId: entry.layerId, ops: undoOps });
+    updateTerrainOptionVisibility();
+    setStatus("Terrain edit undone.");
+    return true;
+  }
+
   function flushPendingTerrainChanges() {
     if (state.terrain.syncTimer) {
       clearTimeout(state.terrain.syncTimer);
@@ -1123,7 +1330,7 @@
   function applyBrushAtCell(layer, x, y) {
     const changeMap = new Map();
     const tile = currentTerrainBrushTile(layer);
-    if (tile === null && selectedTerrainTool() !== "eraser") {
+    if (tile === null && !isTerrainEraseBrush()) {
       return [];
     }
     applyCellsToChangeMap(changeMap, [{ x, y }], tile, state.terrain.brushSize);
@@ -1133,7 +1340,7 @@
   function applyStrokeSegment(layer, fromCell, toCell) {
     const changeMap = new Map();
     const tile = currentTerrainBrushTile(layer);
-    if (tile === null && selectedTerrainTool() !== "eraser") {
+    if (tile === null && !isTerrainEraseBrush()) {
       return [];
     }
     applyCellsToChangeMap(
@@ -1147,7 +1354,7 @@
 
   function applyBucketAtCell(layer, x, y) {
     const tile = currentTerrainBrushTile(layer);
-    if (tile === null) {
+    if (tile === null && !isTerrainEraseBrush()) {
       return [];
     }
     return contiguousFillCells(layer, x, y, tile).map((cell) => ({
@@ -1165,7 +1372,7 @@
     const lineWidth = Math.max(1, Number.parseInt(state.terrain.lineWidth, 10) || 1);
     const fillShapes = Boolean(state.terrain.shapeFilled);
     const tile = currentTerrainBrushTile(layer);
-    if (tile === null) {
+    if (tile === null && !isTerrainEraseBrush()) {
       return [];
     }
     if (stroke.tool === "line") {
@@ -1181,11 +1388,17 @@
   function stopPaintDrag() {
     const stroke = state.terrain.activeStroke;
     if (stroke && stroke.kind === "shape") {
-      const changes = buildShapeChanges(terrainLayerById(stroke.layerId), stroke);
+      const layer = terrainLayerById(stroke.layerId);
+      const changes = buildShapeChanges(layer, stroke);
+      const historyChanges = normalizeTerrainHistoryChanges(layer, changes);
       applyTerrainChangesLocally(stroke.layerId, changes);
       queueTerrainChanges(stroke.layerId, changes, true);
+      pushTerrainUndoEntry(stroke.layerId, historyChanges);
     } else if (stroke && stroke.layerId) {
       flushPendingTerrainChanges();
+      if (stroke.kind === "paint" && stroke.historyChanges && stroke.historyChanges.size > 0) {
+        pushTerrainUndoEntry(stroke.layerId, Array.from(stroke.historyChanges.values()));
+      }
     }
     state.paintDrag.active = false;
     state.paintDrag.paintedCells.clear();
@@ -1211,13 +1424,30 @@
     state.paintDrag.paintedCells.clear();
     if (tool === "bucket") {
       const changes = applyBucketAtCell(layer, x, y);
+      const historyChanges = normalizeTerrainHistoryChanges(layer, changes);
       applyTerrainChangesLocally(layer.id, changes);
       queueTerrainChanges(layer.id, changes, true);
+      pushTerrainUndoEntry(layer.id, historyChanges);
+      state.paintDrag.active = false;
+      return true;
+    }
+    if (tool === "text") {
+      const tile = currentTerrainBrushTile(layer);
+      const changes = tile ? [{ x, y, tile }] : [];
+      if (changes.length === 0) {
+        setStatus("Enter some text first.", true);
+        state.paintDrag.active = false;
+        return false;
+      }
+      const historyChanges = normalizeTerrainHistoryChanges(layer, changes);
+      applyTerrainChangesLocally(layer.id, changes);
+      queueTerrainChanges(layer.id, changes, true);
+      pushTerrainUndoEntry(layer.id, historyChanges);
       state.paintDrag.active = false;
       return true;
     }
     if (["line", "rectangle", "ellipse"].includes(tool)) {
-      if (!currentTerrainBrushTile(layer)) {
+      if (!currentTerrainBrushTile(layer) && !isTerrainEraseBrush()) {
         return false;
       }
       state.terrain.activeStroke = {
@@ -1247,7 +1477,9 @@
       tool,
       layerId: layer.id,
       lastCell: { x, y },
+      historyChanges: new Map(),
     };
+    recordTerrainStrokeChunk(state.terrain.activeStroke, layer, changes);
     state.paintDrag.paintedCells.add(`${x},${y}`);
     return true;
   }
@@ -1284,6 +1516,7 @@
     state.paintDrag.paintedCells.add(key);
     const changes = applyStrokeSegment(layer, stroke.lastCell, { x, y });
     stroke.lastCell = { x, y };
+    recordTerrainStrokeChunk(stroke, layer, changes);
     applyTerrainChangesLocally(layer.id, changes);
     queueTerrainChanges(layer.id, changes);
     return true;
@@ -1390,11 +1623,25 @@
   }
 
   function activeDistanceMode() {
-    return state.tool.distanceMode || "taxicab";
+    return state.tool.distanceMode || "linf";
+  }
+
+  function distanceModeLabel(mode = activeDistanceMode()) {
+    if (mode === "euclidean") {
+      return "Euclidean";
+    }
+    if (mode === "taxicab") {
+      return "Taxicab";
+    }
+    return "L-infinity";
   }
 
   function isToolInteractionEnabled() {
     return (state.activeMenu || "character") === "utilities";
+  }
+
+  function areDrawingsInteractive() {
+    return isToolInteractionEnabled() && !state.tool.dragging && !state.tool.preview;
   }
 
   function setActiveTool(toolKey) {
@@ -1417,7 +1664,8 @@
   }
 
   function setDistanceMode(mode) {
-    const normalized = mode === "euclidean" ? "euclidean" : "taxicab";
+    const normalized =
+      mode === "euclidean" || mode === "taxicab" || mode === "linf" ? mode : "linf";
     state.tool.distanceMode = normalized;
     if (elements.distanceMode) {
       elements.distanceMode.value = normalized;
@@ -1445,6 +1693,9 @@
     const dy = Math.abs(end.y - start.y);
     if (mode === "euclidean") {
       return Math.sqrt(dx * dx + dy * dy);
+    }
+    if (mode === "linf") {
+      return Math.max(dx, dy);
     }
     return dx + dy;
   }
@@ -1622,6 +1873,84 @@
     return Boolean(drawing && (isDm() || drawing.ownerUserId === userId()));
   }
 
+  function clearableDrawings(map = activeMap()) {
+    if (!map || !Array.isArray(map.drawings)) {
+      return [];
+    }
+    return map.drawings.filter((drawing) => drawingCanBeDeleted(drawing));
+  }
+
+  function syncSelectedDrawing(map = activeMap()) {
+    if (!state.tool.selectedDrawingId) {
+      return;
+    }
+    const drawings = map && Array.isArray(map.drawings) ? map.drawings : [];
+    if (!drawings.some((drawing) => drawing.id === state.tool.selectedDrawingId)) {
+      state.tool.selectedDrawingId = null;
+    }
+  }
+
+  function selectDrawingById(drawingId) {
+    state.tool.selectedDrawingId = drawingId || null;
+    renderMeasurementOverlay();
+  }
+
+  function updateDrawingControls(map = activeMap()) {
+    if (!elements.clearDrawings) {
+      return;
+    }
+    const clearable = clearableDrawings(map);
+    elements.clearDrawings.disabled = !isAuthenticated() || clearable.length === 0;
+    elements.clearDrawings.textContent = isDm() ? "Clear all drawings" : "Clear my drawings";
+  }
+
+  function createDrawingHitShape(shape, drawing) {
+    if (!shape || !drawing || !drawing.id) {
+      return null;
+    }
+    const hitShape = shape.cloneNode(false);
+    hitShape.classList.add("tt-drawing-hitarea");
+    hitShape.dataset.drawingId = drawing.id;
+    hitShape.style.opacity = "0";
+    hitShape.style.fill = drawing.type === "distance" ? "none" : "rgba(0, 0, 0, 0.01)";
+    hitShape.style.stroke = "rgba(0, 0, 0, 0.01)";
+    hitShape.style.strokeDasharray = "none";
+    if (drawing.type === "distance") {
+      hitShape.style.pointerEvents = "stroke";
+      hitShape.style.strokeWidth = "16";
+    } else {
+      hitShape.style.pointerEvents = "all";
+      hitShape.style.strokeWidth = "16";
+    }
+    const handleSelect = (event) => {
+      if (!drawing.id) {
+        return;
+      }
+      if (canStartMeasureDrag(event)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const cell = cellFromClientPoint(event.clientX, event.clientY);
+        if (cell) {
+          beginMeasureDrag(cell.x, cell.y, state.tool.cellSize);
+          renderMeasurementOverlay();
+        }
+        return;
+      }
+      if (event.type === "mousedown" && event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      selectDrawingById(drawing.id);
+    };
+    hitShape.addEventListener("mousedown", handleSelect);
+    hitShape.addEventListener("contextmenu", handleSelect);
+    hitShape.title = drawingCanBeDeleted(drawing)
+      ? "Select then press Delete/Backspace to remove."
+      : "Drawing";
+    return hitShape;
+  }
+
   function renderShapeInLayer(layer, drawing, isPreview = false) {
     if (!layer || !drawing || !drawing.data) {
       return;
@@ -1678,21 +2007,14 @@
       shape.style.opacity = "0.62";
     }
     if (!isPreview) {
-      shape.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        state.tool.selectedDrawingId = drawing.id || null;
-        renderMeasurementOverlay();
-      });
-      shape.addEventListener("contextmenu", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        state.tool.selectedDrawingId = drawing.id || null;
-        renderMeasurementOverlay();
-      });
-      shape.title = drawingCanBeDeleted(drawing)
-        ? "Select then press Delete/Backspace to remove."
-        : "Drawing";
+      const hitShape = createDrawingHitShape(shape, drawing);
+      if (hitShape) {
+        layer.appendChild(hitShape);
+      } else {
+        shape.title = drawingCanBeDeleted(drawing)
+          ? "Select then press Delete/Backspace to remove."
+          : "Drawing";
+      }
     }
     layer.appendChild(shape);
   }
@@ -1703,7 +2025,11 @@
     }
     const preview = state.terrain.previewShape;
     const cellSize = state.tool.cellSize || 40;
-    const color = state.terrain.brush.kind === "color" ? state.terrain.brush.color : "#d9a441";
+    const color = isTerrainEraseBrush()
+      ? "#f26a5a"
+      : state.terrain.brush.kind === "color"
+        ? state.terrain.brush.color
+        : "#d9a441";
     if (preview.tool === "line") {
       renderShapeInLayer(
         elements.mapPreviewLayer,
@@ -1789,8 +2115,11 @@
     const map = activeMap();
     if (!map) {
       clearMeasurementOverlay();
+      updateDrawingControls(null);
       return;
     }
+    syncSelectedDrawing(map);
+    updateDrawingControls(map);
     if (elements.mapDrawingsLayer) {
       elements.mapDrawingsLayer.innerHTML = "";
       (Array.isArray(map.drawings) ? map.drawings : [])
@@ -1815,7 +2144,7 @@
           elements.measureReadout.textContent = `Terrain preview: ${selectedTerrainTool()}`;
         } else {
           const selectedLabel = state.tool.selectedDrawingId ? " | Drawing selected" : "";
-          elements.measureReadout.textContent = `Tool: ${activeTool()} (${activeDistanceMode()})${selectedLabel}`;
+          elements.measureReadout.textContent = `Tool: ${activeTool()} (${distanceModeLabel()})${selectedLabel}`;
         }
       }
       if (!hasTerrainPreview && !hasLockFlash && elements.mapPreviewLayer) {
@@ -1938,6 +2267,31 @@
     if (elements.boardWrap) {
       elements.boardWrap.classList.remove("tt-panning");
     }
+  }
+
+  function panMapByWheelDelta(deltaX, deltaY) {
+    if (!activeMap()) {
+      return;
+    }
+    state.mapView.panX -= Number(deltaX) || 0;
+    state.mapView.panY -= Number(deltaY) || 0;
+    applyMapViewTransform();
+  }
+
+  function isPinchZoomWheelEvent(event) {
+    return Boolean(event && event.ctrlKey);
+  }
+
+  function isTrackpadPanWheelEvent(event) {
+    if (!event) {
+      return false;
+    }
+    if (Math.abs(event.deltaX) > 0.01) {
+      return true;
+    }
+    const pixelDelta =
+      typeof WheelEvent !== "undefined" ? WheelEvent.DOM_DELTA_PIXEL : 0;
+    return event.deltaMode === pixelDelta && Math.abs(event.deltaY) < 80;
   }
 
   function zoomMapAtClientPoint(clientX, clientY, deltaY) {
@@ -2383,7 +2737,9 @@
       return;
     }
     elements.root.classList.toggle("tt-left-collapsed", state.leftPanelCollapsed);
-    const rightCollapsed = Boolean(elements.logPanel && elements.logPanel.classList.contains("minimized"));
+    const rightHidden = !canShowSessionLog();
+    const rightCollapsed = !rightHidden && Boolean(elements.logPanel && elements.logPanel.classList.contains("minimized"));
+    elements.root.classList.toggle("tt-right-hidden", rightHidden);
     elements.root.classList.toggle("tt-right-collapsed", rightCollapsed);
   }
 
@@ -2735,8 +3091,24 @@
       placeholder.className = "tt-inline-value";
       placeholder.textContent = "Texture catalog unavailable.";
       elements.brushGroup.appendChild(placeholder);
-      return;
     }
+
+    const eraseButton = document.createElement("div");
+    eraseButton.className = "tt-texture-card";
+    if (isTerrainEraseBrush()) {
+      eraseButton.classList.add("is-active");
+    }
+    const erasePreview = document.createElement("div");
+    erasePreview.className = "tt-texture-preview tt-texture-erase";
+    eraseButton.appendChild(erasePreview);
+    const eraseLabel = document.createElement("div");
+    eraseLabel.className = "tt-texture-label";
+    eraseLabel.textContent = "Erase";
+    eraseButton.appendChild(eraseLabel);
+    eraseButton.addEventListener("click", () => {
+      setTerrainBrushSelection({ kind: "erase" });
+    });
+    elements.brushGroup.appendChild(eraseButton);
 
     const colorButton = document.createElement("div");
     colorButton.className = "tt-texture-card";
@@ -2893,7 +3265,7 @@
       select.appendChild(dot);
 
       const name = document.createElement("span");
-      name.textContent = `${layer.name} (${layer.type})`;
+      name.textContent = `${layer.name} (${terrainLayerTypeLabel(layer.type)})`;
       select.appendChild(name);
       main.appendChild(select);
 
@@ -2953,14 +3325,14 @@
 
     if (elements.terrainActiveLayer) {
       elements.terrainActiveLayer.textContent = activeLayer
-        ? `${activeLayer.name} (${activeLayer.type})`
+        ? `${activeLayer.name} (${terrainLayerTypeLabel(activeLayer.type)})`
         : "No layer selected";
     }
   }
 
   function renderTerrainEditor() {
     ensureActiveTerrainLayer();
-    if (!state.terrain.brush.textureId && terrainCategories().length > 0) {
+    if (state.terrain.brush.kind === "texture" && !state.terrain.brush.textureId && terrainCategories().length > 0) {
       const groundCategory = terrainCategories().find((entry) => entry.id === "Ground") || terrainCategories()[0];
       if (groundCategory) {
         setTerrainBrushSelection({
@@ -2978,6 +3350,9 @@
     }
     if (elements.terrainOpacity && document.activeElement !== elements.terrainOpacity) {
       elements.terrainOpacity.value = String(state.terrain.opacity || 1);
+    }
+    if (elements.terrainTextInput && document.activeElement !== elements.terrainTextInput) {
+      elements.terrainTextInput.value = state.terrain.textValue || "";
     }
     if (elements.terrainShapeFilled) {
       elements.terrainShapeFilled.checked = Boolean(state.terrain.shapeFilled);
@@ -3407,6 +3782,7 @@
     const toolMode = isToolInteractionEnabled() && state.tool.dragging;
     elements.mapGridWrap.classList.toggle("tt-mode-paint", paintMode);
     elements.mapGridWrap.classList.toggle("tt-mode-measure", toolMode);
+    elements.mapGridWrap.classList.toggle("tt-mode-drawing-passive", !areDrawingsInteractive());
     if (elements.brushPanel) {
       elements.brushPanel.style.opacity = "";
       elements.brushPanel.style.pointerEvents = "";
@@ -3502,6 +3878,9 @@
     if (state.tool.dragging) {
       return;
     }
+    if (Date.now() < state.tokenDrag.suppressClickUntil) {
+      return;
+    }
     if (Date.now() < state.suppressCellClickUntil) {
       return;
     }
@@ -3555,17 +3934,14 @@
     }
 
     if (state.selectedTokenIds.size === 1) {
-      const tokenId = [...state.selectedTokenIds][0];
-      if (hadTokenInfo) {
-        renderTokenPanel();
-        renderMapGrid();
-      }
-      emit("token:move", { tokenId, x, y });
+      clearSelectedTokens();
+      renderTokenPanel();
+      renderMapGrid();
       return;
     }
 
-    const topCell = topTerrainCellAt(x, y);
-    if (state.selectedTokenIds.size === 0 && topCell && topCell.tile && topCell.tile.kind === "door") {
+    const doorCell = topDoorTerrainCellAt(x, y);
+    if (state.selectedTokenIds.size === 0 && doorCell) {
       if (hadTokenInfo) {
         renderTokenPanel();
         renderMapGrid();
@@ -3667,18 +4043,54 @@
     context.restore();
   }
 
-  function drawTerrainTile(context, tile, x, y, cellSize) {
-    const left = x * cellSize;
-    const top = y * cellSize;
+  function boardPixelSize(map, fallbackCellSize = 40) {
+    const width = elements.mapGridCells ? elements.mapGridCells.offsetWidth : 0;
+    const height = elements.mapGridCells ? elements.mapGridCells.offsetHeight : 0;
+    if (width > 0 && height > 0) {
+      return { width, height };
+    }
+    return {
+      width: map.cols * fallbackCellSize,
+      height: map.rows * fallbackCellSize,
+    };
+  }
+
+  function cellPixelRect(map, x, y, fallbackCellSize = 40) {
+    const index = mapCellIndex(map, x, y);
+    const cell = elements.mapGridCells && elements.mapGridCells.children
+      ? elements.mapGridCells.children[index]
+      : null;
+    if (cell instanceof HTMLElement) {
+      return {
+        left: cell.offsetLeft,
+        top: cell.offsetTop,
+        width: cell.offsetWidth,
+        height: cell.offsetHeight,
+      };
+    }
+    return {
+      left: x * fallbackCellSize,
+      top: y * fallbackCellSize,
+      width: fallbackCellSize,
+      height: fallbackCellSize,
+    };
+  }
+
+  function drawTerrainTile(context, tile, rect) {
+    const left = rect.left;
+    const top = rect.top;
+    const width = rect.width;
+    const height = rect.height;
+    const tileSize = Math.max(1, Math.min(width, height));
     if (tile.kind === "texture") {
-      const textureCanvas = cachedTextureTile(tile.textureId, cellSize);
+      const textureCanvas = cachedTextureTile(tile.textureId, tileSize);
       context.save();
       context.globalAlpha = tile.alpha === undefined ? 1 : tile.alpha;
       if (textureCanvas) {
-        context.drawImage(textureCanvas, left, top, cellSize, cellSize);
+        context.drawImage(textureCanvas, left, top, width, height);
       } else {
         context.fillStyle = "rgba(90, 103, 90, 0.65)";
-        context.fillRect(left, top, cellSize, cellSize);
+        context.fillRect(left, top, width, height);
       }
       context.restore();
       return;
@@ -3687,12 +4099,27 @@
       context.save();
       context.globalAlpha = tile.alpha === undefined ? 1 : tile.alpha;
       context.fillStyle = normalizeTerrainColor(tile.color);
-      context.fillRect(left, top, cellSize, cellSize);
+      context.fillRect(left, top, width, height);
       context.restore();
       return;
     }
     if (tile.kind === "door") {
-      drawDoorTile(context, tile, left, top, cellSize);
+      drawDoorTile(context, tile, left, top, tileSize);
+      return;
+    }
+    if (tile.kind === "text") {
+      context.save();
+      context.globalAlpha = tile.alpha === undefined ? 1 : tile.alpha;
+      context.fillStyle = normalizeTerrainColor(tile.color || "#f3e7b3");
+      context.font = `600 ${Math.max(11, Math.floor(tileSize * (tile.text && tile.text.length > 10 ? 0.24 : 0.34)))}px serif`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.strokeStyle = "rgba(16, 10, 6, 0.7)";
+      context.lineWidth = Math.max(2, tileSize * 0.06);
+      context.lineJoin = "round";
+      context.strokeText(String(tile.text || ""), left + width / 2, top + height / 2);
+      context.fillText(String(tile.text || ""), left + width / 2, top + height / 2);
+      context.restore();
     }
   }
 
@@ -3720,8 +4147,9 @@
     }
 
     const cellSize = state.tool.cellSize || 40;
-    const width = map.cols * cellSize;
-    const height = map.rows * cellSize;
+    const boardSize = boardPixelSize(map, cellSize);
+    const width = boardSize.width;
+    const height = boardSize.height;
     const validIds = new Set();
 
     terrainLayers(map).forEach((terrainLayer, index) => {
@@ -3770,7 +4198,7 @@
           if (!tile) {
             continue;
           }
-          drawTerrainTile(context, tile, x, y, cellSize);
+          drawTerrainTile(context, tile, cellPixelRect(map, x, y, cellSize));
         }
       }
     });
@@ -3853,55 +4281,75 @@
       return true;
     }
 
-    const dx = targetX - originX;
-    const dy = targetY - originY;
-    const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
-    const stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
+    const startX = originX + 0.5;
+    const startY = originY + 0.5;
+    const endX = targetX + 0.5;
+    const endY = targetY + 0.5;
+    const deltaX = endX - startX;
+    const deltaY = endY - startY;
+    const stepX = deltaX === 0 ? 0 : deltaX > 0 ? 1 : -1;
+    const stepY = deltaY === 0 ? 0 : deltaY > 0 ? 1 : -1;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
 
-    let x = originX;
-    let y = originY;
-    let traversedX = 0;
-    let traversedY = 0;
+    let currentX = originX;
+    let currentY = originY;
 
     const blocks = (cellX, cellY) => {
+      if (cellX < 0 || cellY < 0 || cellX >= map.cols || cellY >= map.rows) {
+        return true;
+      }
       if (cellX === targetX && cellY === targetY) {
         return false;
       }
       return blockers[mapCellIndex(map, cellX, cellY)] === 1;
     };
 
-    while (traversedX < absDx || traversedY < absDy) {
-      const decision = (1 + 2 * traversedX) * absDy - (1 + 2 * traversedY) * absDx;
-      if (decision === 0) {
+    let tMaxX = Number.POSITIVE_INFINITY;
+    let tMaxY = Number.POSITIVE_INFINITY;
+    let tDeltaX = Number.POSITIVE_INFINITY;
+    let tDeltaY = Number.POSITIVE_INFINITY;
+
+    if (stepX !== 0) {
+      const nextBoundaryX = stepX > 0 ? currentX + 1 : currentX;
+      tMaxX = Math.abs((nextBoundaryX - startX) / deltaX);
+      tDeltaX = 1 / absDeltaX;
+    }
+    if (stepY !== 0) {
+      const nextBoundaryY = stepY > 0 ? currentY + 1 : currentY;
+      tMaxY = Math.abs((nextBoundaryY - startY) / deltaY);
+      tDeltaY = 1 / absDeltaY;
+    }
+
+    for (let steps = 0; steps < map.rows * map.cols; steps += 1) {
+      if (tMaxX < tMaxY) {
+        currentX += stepX;
+        tMaxX += tDeltaX;
+      } else if (tMaxY < tMaxX) {
+        currentY += stepY;
+        tMaxY += tDeltaY;
+      } else {
         if (
-          (stepX !== 0 && blocks(x + stepX, y)) ||
-          (stepY !== 0 && blocks(x, y + stepY))
+          (stepX !== 0 && blocks(currentX + stepX, currentY)) ||
+          (stepY !== 0 && blocks(currentX, currentY + stepY))
         ) {
           return false;
         }
-        x += stepX;
-        y += stepY;
-        traversedX += 1;
-        traversedY += 1;
-      } else if (decision < 0) {
-        x += stepX;
-        traversedX += 1;
-      } else {
-        y += stepY;
-        traversedY += 1;
+        currentX += stepX;
+        currentY += stepY;
+        tMaxX += tDeltaX;
+        tMaxY += tDeltaY;
       }
 
-      if (x === targetX && y === targetY) {
+      if (currentX === targetX && currentY === targetY) {
         return true;
       }
-      if (blocks(x, y)) {
+      if (blocks(currentX, currentY)) {
         return false;
       }
     }
 
-    return true;
+    return false;
   }
 
   function collectLightSources(map) {
@@ -4013,7 +4461,7 @@
           if (!hasLineOfSight(map, token.x, token.y, x, y, blockers.vision)) {
             continue;
           }
-          if (illumination[index] > 0 && hasLineOfSight(map, token.x, token.y, x, y, blockers.light)) {
+          if (illumination[index] > 0) {
             visible[index] = Math.max(visible[index], illumination[index] === 2 ? 3 : 2);
             continue;
           }
@@ -4051,8 +4499,9 @@
       return;
     }
     const canvas = elements.mapVisionLayer;
-    const width = map.cols * cellSize;
-    const height = map.rows * cellSize;
+    const boardSize = boardPixelSize(map, cellSize);
+    const width = boardSize.width;
+    const height = boardSize.height;
     canvas.width = width;
     canvas.height = height;
     canvas.style.width = `${width}px`;
@@ -4074,25 +4523,24 @@
     for (let y = 0; y < map.rows; y += 1) {
       for (let x = 0; x < map.cols; x += 1) {
         const stateValue = visibilityState.cells[mapCellIndex(map, x, y)];
-        const left = x * cellSize;
-        const top = y * cellSize;
+        const rect = cellPixelRect(map, x, y, cellSize);
         if (stateValue === 3) {
           continue;
         }
         if (stateValue === 2) {
           context.fillStyle = `rgba(0, 0, 0, ${lighting.dimAlpha})`;
-          context.fillRect(left, top, cellSize, cellSize);
+          context.fillRect(rect.left, rect.top, rect.width, rect.height);
           continue;
         }
         if (stateValue === 1) {
           context.fillStyle = "rgba(0, 0, 0, 0.62)";
-          context.fillRect(left, top, cellSize, cellSize);
+          context.fillRect(rect.left, rect.top, rect.width, rect.height);
           context.fillStyle = `rgba(${darkvisionRgb[0]}, ${darkvisionRgb[1]}, ${darkvisionRgb[2]}, ${lighting.darkvisionAlpha})`;
-          context.fillRect(left, top, cellSize, cellSize);
+          context.fillRect(rect.left, rect.top, rect.width, rect.height);
           continue;
         }
         context.fillStyle = "rgba(0, 0, 0, 1)";
-        context.fillRect(left, top, cellSize, cellSize);
+        context.fillRect(rect.left, rect.top, rect.width, rect.height);
       }
     }
   }
@@ -4354,10 +4802,22 @@
         if (event.button !== 0 || !isTokenInteractionAllowed() || canStartMeasureDrag(event)) {
           return;
         }
-        beginDragSelect(event);
+        event.stopPropagation();
+        if (
+          !event.shiftKey &&
+          canCurrentUserControlToken(token) &&
+          state.selectedTokenIds.size === 1 &&
+          state.selectedTokenIds.has(token.id)
+        ) {
+          event.preventDefault();
+          beginTokenDrag(token, event);
+        }
       });
 
       tokenEl.addEventListener("click", (event) => {
+        if (Date.now() < state.tokenDrag.suppressClickUntil) {
+          return;
+        }
         if ((isToolInteractionEnabled() && state.tool.dragging) || isPaintModeActive() || !isTokenInteractionAllowed()) {
           return;
         }
@@ -4406,7 +4866,7 @@
       });
 
       if (canCurrentUserControlToken(token) && isTokenInteractionAllowed()) {
-        tokenEl.title = "Click for info and selection, then click a destination tile to move.";
+        tokenEl.title = "Click for info and selection. Drag or use arrow keys to move.";
       } else if (canCurrentUserInspectToken(token)) {
         tokenEl.title = "Click for token info.";
       } else {
@@ -4732,6 +5192,108 @@
     }
   }
 
+  function clearSelectedTokens() {
+    if (state.selectedTokenIds.size === 0) {
+      return false;
+    }
+    state.selectedTokenIds.clear();
+    renderSelectedTokenControls();
+    return true;
+  }
+
+  function selectedControllableToken() {
+    if (state.selectedTokenIds.size !== 1) {
+      return null;
+    }
+    const tokenId = [...state.selectedTokenIds][0];
+    const token = getTokenById(tokenId);
+    if (!token || !canCurrentUserControlToken(token)) {
+      return null;
+    }
+    return token;
+  }
+
+  function beginTokenDrag(token, event) {
+    if (!token || !event) {
+      return false;
+    }
+    state.tokenDrag.active = true;
+    state.tokenDrag.tokenId = token.id;
+    state.tokenDrag.startClientX = event.clientX;
+    state.tokenDrag.startClientY = event.clientY;
+    state.tokenDrag.hoverCell = { x: Number(token.x) || 0, y: Number(token.y) || 0 };
+    state.tokenDrag.dragStarted = false;
+    return true;
+  }
+
+  function updateTokenDrag(event) {
+    if (!state.tokenDrag.active) {
+      return false;
+    }
+    const token = getTokenById(state.tokenDrag.tokenId);
+    if (!token || !canCurrentUserControlToken(token)) {
+      state.tokenDrag.active = false;
+      state.tokenDrag.tokenId = null;
+      state.tokenDrag.hoverCell = null;
+      state.tokenDrag.dragStarted = false;
+      return false;
+    }
+    const movedX = Math.abs(event.clientX - state.tokenDrag.startClientX);
+    const movedY = Math.abs(event.clientY - state.tokenDrag.startClientY);
+    if (movedX > 4 || movedY > 4) {
+      state.tokenDrag.dragStarted = true;
+    }
+    const cell = cellFromClientPoint(event.clientX, event.clientY);
+    if (cell) {
+      state.tokenDrag.hoverCell = cell;
+    }
+    return true;
+  }
+
+  function endTokenDrag(event) {
+    if (!state.tokenDrag.active) {
+      return false;
+    }
+    const tokenId = state.tokenDrag.tokenId;
+    const dragged = state.tokenDrag.dragStarted;
+    let targetCell = state.tokenDrag.hoverCell;
+    if (!targetCell && event) {
+      targetCell = cellFromClientPoint(event.clientX, event.clientY);
+    }
+    state.tokenDrag.active = false;
+    state.tokenDrag.tokenId = null;
+    state.tokenDrag.hoverCell = null;
+    state.tokenDrag.dragStarted = false;
+    if (!dragged) {
+      return false;
+    }
+    state.tokenDrag.suppressClickUntil = Date.now() + 250;
+    const token = getTokenById(tokenId);
+    if (!token || !targetCell || !canCurrentUserControlToken(token)) {
+      return true;
+    }
+    if (targetCell.x === token.x && targetCell.y === token.y) {
+      return true;
+    }
+    emit("token:move", { tokenId: token.id, x: targetCell.x, y: targetCell.y });
+    return true;
+  }
+
+  function moveSelectedTokenBy(dx, dy) {
+    const token = selectedControllableToken();
+    const map = activeMap();
+    if (!token || !map) {
+      return false;
+    }
+    const targetX = token.x + dx;
+    const targetY = token.y + dy;
+    if (targetX < 0 || targetX >= map.cols || targetY < 0 || targetY >= map.rows) {
+      return false;
+    }
+    emit("token:move", { tokenId: token.id, x: targetX, y: targetY });
+    return true;
+  }
+
   const HIDDEN_SELF_MODIFIERS = new Set(["bottled_luck"]);
 
   const MAJOR_SKILL_ORDER = [
@@ -4811,6 +5373,20 @@
     return "major_skill";
   }
 
+  function rollContextOptionsForSkill(skillName) {
+    const normalized = normalizeLabel(skillName);
+    if (normalized === "beseech the gods" || normalized === "prepared prayer") {
+      return [
+        { value: "beseech_the_gods", label: "Beseech the Gods" },
+        { value: "prepared_prayer", label: "Prepared Prayer" },
+        { value: "prayer", label: "Prayer" },
+        { value: "prayer_humility", label: "Prayer (humility)" },
+      ];
+    }
+    const rollType = deriveRollTypeFromSkill(skillName);
+    return [{ value: rollType, label: rollContextLabel(rollType) }];
+  }
+
   function rollContextLabel(rollType) {
     const labels = {
       major_skill: "Major Skill",
@@ -4819,6 +5395,8 @@
       saving_throw: "Saving Throw",
       beseech_the_gods: "Beseech the Gods",
       prepared_prayer: "Prepared Prayer",
+      prayer: "Prayer",
+      prayer_humility: "Prayer (humility)",
       constitution_check: "Constitution Check",
       resistive_willpower: "Resistive Willpower",
     };
@@ -4826,19 +5404,29 @@
   }
 
   function rollContextValue() {
-    return normalizeLabel(
-      elements.rollTypeDisplay && elements.rollTypeDisplay.dataset
-        ? elements.rollTypeDisplay.dataset.value
-        : elements.rollTypeDisplay.textContent
-    ) || "major_skill";
+    return normalizeLabel(elements.rollTypeSelect ? elements.rollTypeSelect.value : "") || "major_skill";
   }
 
-  function setRollContext(rollType) {
+  function setRollContext(rollType, skillName = elements.rollSkillSelect ? elements.rollSkillSelect.value : "") {
     const normalized = normalizeLabel(rollType) || "major_skill";
-    if (elements.rollTypeDisplay && elements.rollTypeDisplay.dataset) {
-      elements.rollTypeDisplay.dataset.value = normalized;
+    if (!elements.rollTypeSelect) {
+      return;
     }
-    elements.rollTypeDisplay.textContent = rollContextLabel(normalized);
+    const options = rollContextOptionsForSkill(skillName);
+    elements.rollTypeSelect.innerHTML = "";
+    options.forEach((optionData) => {
+      const option = document.createElement("option");
+      option.value = optionData.value;
+      option.textContent = optionData.label;
+      elements.rollTypeSelect.appendChild(option);
+    });
+    const nextValue = options.some((option) => option.value === normalized)
+      ? normalized
+      : options[0]
+        ? options[0].value
+        : "major_skill";
+    elements.rollTypeSelect.value = nextValue;
+    elements.rollTypeSelect.disabled = options.length <= 1;
   }
 
   function normalizedSkillValue() {
@@ -4890,7 +5478,7 @@
     const entity = parsed ? parsed.entity : null;
     const skillName = elements.rollSkillSelect.value;
     const rollType = deriveRollTypeFromSkill(skillName, rollTypeHint);
-    setRollContext(rollType);
+    setRollContext(rollType, skillName);
 
     const selectedKey = `${parsed ? `${parsed.type}:${parsed.id}` : "none"}:${normalizeLabel(skillName)}`;
     if (state.lastRollSkillKey !== selectedKey) {
@@ -4967,6 +5555,59 @@
     return resolved;
   }
 
+  function normalizeCounterToken(text) {
+    return normalizeLabel(text).replace(/[^a-z0-9]/g, "");
+  }
+
+  function findUsageCounterForEntityModifier(entity, modifierId, definition) {
+    const parsed = entity && entity.parsedSheet ? entity.parsedSheet : null;
+    const meta = parsed && parsed.currentValueMeta && typeof parsed.currentValueMeta === "object"
+      ? parsed.currentValueMeta
+      : null;
+    if (!meta) {
+      return null;
+    }
+
+    const candidates = [];
+    if (definition && Array.isArray(definition.featNames)) {
+      candidates.push(...definition.featNames);
+    }
+    candidates.push(modifierId);
+    candidates.push(String(modifierId || "").replace(/_/g, " "));
+
+    const wantedTokens = candidates.map((name) => normalizeCounterToken(name)).filter(Boolean);
+    if (wantedTokens.length === 0) {
+      return null;
+    }
+
+    for (const [key, details] of Object.entries(meta)) {
+      const keyToken = normalizeCounterToken(key);
+      if (!keyToken || !details || !details.hasCurrent) {
+        continue;
+      }
+      const matches = wantedTokens.some(
+        (token) => token === keyToken || token.includes(keyToken) || keyToken.includes(token)
+      );
+      if (!matches) {
+        continue;
+      }
+      const remainingNumeric = Number(details.currentValue);
+      if (!Number.isFinite(remainingNumeric)) {
+        continue;
+      }
+      return {
+        key,
+        remainingNumeric,
+      };
+    }
+    return null;
+  }
+
+  function entityModifierHasRemainingUses(entity, modifierId, definition) {
+    const usageCounter = findUsageCounterForEntityModifier(entity, modifierId, definition);
+    return !usageCounter || usageCounter.remainingNumeric > 0;
+  }
+
   function doesModifierApply(modifierMeta, rollType, skillName) {
     if (!modifierMeta || !Array.isArray(modifierMeta.appliesTo)) {
       return true;
@@ -4984,16 +5625,98 @@
     if (appliesTo.includes(normalizedSkill)) {
       return true;
     }
-    if (appliesTo.includes("any_skill") && normalizedRollType.includes("skill")) {
+    if (
+      appliesTo.includes("any_skill") &&
+      (
+        normalizedRollType.includes("skill") ||
+        ["beseech_the_gods", "prepared_prayer", "prayer", "prayer_humility"].includes(normalizedRollType)
+      )
+    ) {
       return true;
     }
     if (
       appliesTo.includes("beseech_the_gods") &&
-      (normalizedRollType === "beseech_the_gods" || normalizedRollType === "prepared_prayer")
+      ["beseech_the_gods", "prepared_prayer", "prayer", "prayer_humility"].includes(normalizedRollType)
     ) {
       return true;
     }
     return false;
+  }
+
+  function formatRollNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return "0";
+    }
+    if (Math.abs(numeric - Math.round(numeric)) < 0.0001) {
+      return String(Math.round(numeric));
+    }
+    return numeric.toFixed(2).replace(/\.?0+$/, "");
+  }
+
+  function formatSignedRollNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || Math.abs(numeric) < 0.0001) {
+      return "+0";
+    }
+    return `${numeric >= 0 ? "+" : ""}${formatRollNumber(numeric)}`;
+  }
+
+  function rollModifierLabel(modifierId) {
+    const meta = mapOfModifierCatalog()[modifierId];
+    return meta && Array.isArray(meta.featNames) && meta.featNames[0] ? meta.featNames[0] : modifierId;
+  }
+
+  function formatGuidingDie(entry) {
+    if (!entry) {
+      return "";
+    }
+    if (Array.isArray(entry.dice) && entry.dice.length > 0) {
+      return `${entry.type}[${entry.dice.join(",")}]=>${formatRollNumber(entry.roll)}`;
+    }
+    return `${entry.type}:${formatRollNumber(entry.roll)}`;
+  }
+
+  function rollGroupText(rollData) {
+    const groups = rollData && rollData.d20 && Array.isArray(rollData.d20.groups) ? rollData.d20.groups : [];
+    if (groups.length > 1) {
+      return groups
+        .map((group, index) => `#${index + 1}[${group.dice.join(",")}]=>${group.selected}`)
+        .join(" | ");
+    }
+    return rollData && rollData.d20 && Array.isArray(rollData.d20.dice)
+      ? rollData.d20.dice.join(", ")
+      : "-";
+  }
+
+  function rollBreakdownText(rollData) {
+    if (!rollData) {
+      return "";
+    }
+    const parts = [`d20 ${formatRollNumber(rollData.d20 && rollData.d20.selected)}`];
+    parts.push(`skill ${formatSignedRollNumber(rollData.skillBonus)}`);
+    if (rollData.prayerApplied && rollData.divineFavorBonus !== null && rollData.divineFavorBonus !== undefined) {
+      parts.push(`divine favor ${formatSignedRollNumber(rollData.divineFavorBonus)}`);
+    }
+    if (rollData.humilityApplied) {
+      parts.push("humility x0.5");
+    }
+    if (rollData.fortuneOverFinesse && rollData.fortuneOverFinesse.bonusSubtracted) {
+      parts.push(`FoF ${formatSignedRollNumber(-rollData.fortuneOverFinesse.bonusSubtracted)}`);
+    }
+    if (rollData.flatModifier) {
+      parts.push(`other ${formatSignedRollNumber(rollData.flatModifier)}`);
+    }
+    if (Array.isArray(rollData.guidingDice) && rollData.guidingDice.length > 0) {
+      parts.push(`extra ${rollData.guidingDice.map((entry) => formatGuidingDie(entry)).join(", ")}`);
+    }
+    if (rollData.bonusPenalty) {
+      parts.push(`post ${formatSignedRollNumber(rollData.bonusPenalty)}`);
+    }
+    if (rollData.postShift) {
+      parts.push(`shift ${formatSignedRollNumber(rollData.postShift)}`);
+    }
+    return parts.join(" | ");
   }
 
   function parseEntitySelectValue(value) {
@@ -5085,6 +5808,9 @@
         return;
       }
       const meta = catalog[modifierId];
+      if (!entityModifierHasRemainingUses(entity, modifierId, meta)) {
+        return;
+      }
       if (!doesModifierApply(meta, rollType, skillName)) {
         return;
       }
@@ -5240,7 +5966,11 @@
           }
           const modifiers = deriveModifiersFromEntity(entity).filter((modifierId) => {
             const meta = mapOfModifierCatalog()[modifierId];
-            return Boolean(meta && meta.requiresApproval);
+            return Boolean(
+              meta &&
+              meta.requiresApproval &&
+              entityModifierHasRemainingUses(entity, modifierId, meta)
+            );
           });
           if (modifiers.length === 0) {
             return;
@@ -5284,7 +6014,7 @@
     Array.from(availableModifiersForUser).forEach((modifierId) => {
       const option = document.createElement("option");
       option.value = modifierId;
-      option.textContent = modifierId;
+      option.textContent = rollModifierLabel(modifierId);
       elements.allyModifierId.appendChild(option);
     });
 
@@ -5334,6 +6064,21 @@
   }
 
   function renderLogs() {
+    const showPanel = canShowSessionLog();
+    if (elements.logPanel) {
+      elements.logPanel.classList.toggle("tt-hidden", !showPanel);
+    }
+    if (elements.chatInput) {
+      elements.chatInput.disabled = !showPanel;
+    }
+    if (elements.logToggle) {
+      elements.logToggle.disabled = !showPanel;
+    }
+    updateRootLayoutClasses();
+    if (!showPanel) {
+      elements.logEntries.innerHTML = "";
+      return;
+    }
     const logs = (state.snapshot && state.snapshot.logs) || [];
     elements.logEntries.innerHTML = "";
 
@@ -5354,14 +6099,22 @@
         const rollLine = document.createElement("div");
         rollLine.className = "tt-log-meta";
         const rollData = entry.details.roll;
-        const groups = Array.isArray(rollData.d20.groups) ? rollData.d20.groups : [];
-        const groupText = groups.length > 1
-          ? `groups: ${groups
-            .map((group, index) => `#${index + 1}[${group.dice.join(",")}]=>${group.selected}`)
-            .join(" | ")}`
-          : `d20s: ${rollData.d20.dice.join(", ")}`;
-        rollLine.textContent = `${groupText} | selected ${rollData.d20.selected} | total ${rollData.total}`;
+        rollLine.textContent = `d20s: ${rollGroupText(rollData)} | selected ${formatRollNumber(rollData.d20.selected)} | total ${formatRollNumber(rollData.total)}`;
         block.appendChild(rollLine);
+
+        const breakdownLine = document.createElement("div");
+        breakdownLine.className = "tt-log-meta";
+        breakdownLine.textContent = `breakdown: ${rollBreakdownText(rollData)}`;
+        block.appendChild(breakdownLine);
+
+        if (Array.isArray(rollData.modifiersApplied) && rollData.modifiersApplied.length > 0) {
+          const modifierLine = document.createElement("div");
+          modifierLine.className = "tt-log-meta";
+          modifierLine.textContent = `modifiers: ${rollData.modifiersApplied
+            .map((modifier) => rollModifierLabel(modifier && modifier.id ? modifier.id : modifier))
+            .join(", ")}`;
+          block.appendChild(modifierLine);
+        }
 
         if (rollData.isdcCheck && rollData.isdcCheck.required) {
           const isdcLine = document.createElement("div");
@@ -5397,6 +6150,7 @@
     if (!state.snapshot) {
       return;
     }
+    syncTerrainUndoContext();
 
     renderAuth();
     renderCampaigns();
@@ -5982,12 +6736,17 @@
     });
   }
 
+  if (elements.terrainUndo) {
+    elements.terrainUndo.addEventListener("click", () => {
+      undoTerrainEdit();
+    });
+  }
+
   if (elements.terrainLayerNew) {
     elements.terrainLayerNew.addEventListener("click", () => {
+      const layerType = elements.terrainLayerNewType ? elements.terrainLayerNewType.value : "background";
       emit("terrain:layerCreate", {
-        type: elements.terrainLayerNewType && elements.terrainLayerNewType.value === "foreground"
-          ? "foreground"
-          : "background",
+        type: layerType === "foreground" || layerType === "gm" ? layerType : "background",
       });
     });
   }
@@ -6014,6 +6773,14 @@
     };
     elements.terrainOpacity.addEventListener("input", syncOpacity);
     elements.terrainOpacity.addEventListener("change", syncOpacity);
+  }
+
+  if (elements.terrainTextInput) {
+    const syncTerrainText = () => {
+      state.terrain.textValue = sanitizeTerrainText(elements.terrainTextInput.value);
+    };
+    elements.terrainTextInput.addEventListener("input", syncTerrainText);
+    elements.terrainTextInput.addEventListener("change", syncTerrainText);
   }
 
   if (elements.terrainShapeFilled) {
@@ -6179,6 +6946,12 @@
     renderRollModifiers();
   });
 
+  if (elements.rollTypeSelect) {
+    elements.rollTypeSelect.addEventListener("change", () => {
+      renderRollModifiers();
+    });
+  }
+
   elements.requestAllyModifier.addEventListener("click", () => {
     const targetUserId = elements.allySourceUser.value;
     const modifierId = elements.allyModifierId.value;
@@ -6302,6 +7075,18 @@
       renderMeasurementOverlay();
     });
   }
+  if (elements.clearDrawings) {
+    elements.clearDrawings.addEventListener("click", () => {
+      const drawings = clearableDrawings();
+      if (drawings.length === 0) {
+        return;
+      }
+      emit("map:clearDrawings");
+      state.tool.selectedDrawingId = null;
+      setStatus(isDm() ? "Clearing all drawings..." : "Clearing your drawings...");
+      renderMeasurementOverlay();
+    });
+  }
 
   if (elements.boardWrap) {
     elements.boardWrap.addEventListener("contextmenu", (event) => {
@@ -6317,6 +7102,14 @@
           return;
         }
         event.preventDefault();
+        if (isPinchZoomWheelEvent(event)) {
+          zoomMapAtClientPoint(event.clientX, event.clientY, event.deltaY);
+          return;
+        }
+        if (isTrackpadPanWheelEvent(event)) {
+          panMapByWheelDelta(event.deltaX, event.deltaY);
+          return;
+        }
         zoomMapAtClientPoint(event.clientX, event.clientY, event.deltaY);
       },
       { passive: false }
@@ -6334,6 +7127,9 @@
   }
 
   window.addEventListener("mousemove", (event) => {
+    if (updateTokenDrag(event)) {
+      return;
+    }
     continueMapPan(event);
     updateDragSelect(event);
     if (!state.tool.dragging || !isToolInteractionEnabled()) {
@@ -6350,6 +7146,7 @@
     stopPaintDrag();
     endMeasureDrag();
     stopMapPan();
+    endTokenDrag(event);
     endDragSelect(event);
   });
 
@@ -6361,11 +7158,36 @@
   });
 
   window.addEventListener("keydown", (event) => {
-    if (event.key !== "Delete" && event.key !== "Backspace") {
-      return;
-    }
     const focused = document.activeElement;
     if (focused && (focused.tagName === "INPUT" || focused.tagName === "TEXTAREA" || focused.isContentEditable)) {
+      return;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && String(event.key || "").toLowerCase() === "z") {
+      if (undoTerrainEdit()) {
+        event.preventDefault();
+      }
+      return;
+    }
+
+    const movementByKey = {
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+    };
+    if (movementByKey[event.key]) {
+      if (!isTokenInteractionAllowed()) {
+        return;
+      }
+      const [dx, dy] = movementByKey[event.key];
+      if (moveSelectedTokenBy(dx, dy)) {
+        event.preventDefault();
+      }
+      return;
+    }
+
+    if (event.key !== "Delete" && event.key !== "Backspace") {
       return;
     }
 
@@ -6441,6 +7263,7 @@
   });
 
   socket.on("tabletop:state", (snapshot) => {
+    const previousMapId = activeMap() ? activeMap().id || null : null;
     state.snapshot = snapshot;
     if (state.snapshot && state.snapshot.scene && state.snapshot.scene.map) {
       Array.from(state.terrain.pendingChanges.entries()).forEach(([key, change]) => {
@@ -6451,6 +7274,12 @@
         }
         layer.cells[change.y][change.x] = cloneTerrainTile(change.tile);
       });
+    }
+    const nextMapId = activeMap() ? activeMap().id || null : null;
+    if (previousMapId !== nextMapId) {
+      resetTerrainUndoStack();
+    } else {
+      state.terrain.undoMapId = nextMapId;
     }
     if (snapshot && snapshot.auth && snapshot.auth.sessionToken) {
       localStorage.setItem(STORAGE_SESSION_KEY, snapshot.auth.sessionToken);
@@ -6534,17 +7363,6 @@
     if (!roll) {
       return;
     }
-    const groups = roll.d20 && Array.isArray(roll.d20.groups) ? roll.d20.groups : [];
-    const diceText = groups.length > 1
-      ? groups
-        .map((group, index) => `#${index + 1}[${group.dice.join(",")}]=>${group.selected}`)
-        .join(" | ")
-      : roll.d20 && Array.isArray(roll.d20.dice)
-        ? roll.d20.dice.join(", ")
-        : "-";
-    const guidanceText = Array.isArray(roll.guidingDice) && roll.guidingDice.length > 0
-      ? ` | extra: ${roll.guidingDice.map((entry) => `${entry.type}:${entry.roll}`).join(", ")}`
-      : "";
     const fofText =
       roll.fortuneOverFinesse && roll.fortuneOverFinesse.enabled
         ? ` | FoF groups: +${roll.fortuneOverFinesse.extraGroups}`
@@ -6554,7 +7372,7 @@
         ? ` | ISDC ${roll.isdcCheck.passed ? "pass" : "fail"} (${roll.isdcCheck.total}/${roll.isdcCheck.dc})`
         : "";
     elements.rollResult.textContent =
-      `${payload.entityName}: ${roll.total} | d20: ${diceText}${fofText}${guidanceText}${isdcText}`;
+      `${payload.entityName}: ${rollBreakdownText(roll)} | d20s: ${rollGroupText(roll)}${fofText}${isdcText} | total ${formatRollNumber(roll.total)}`;
   });
 
   socket.on("roll:groupRequested", (payload) => {
