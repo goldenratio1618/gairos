@@ -133,6 +133,8 @@
     lightingDarkvisionTint: document.getElementById("lighting-darkvision-tint"),
     lightingDarkvisionStrength: document.getElementById("lighting-darkvision-strength"),
     lightingDarkvisionStrengthValue: document.getElementById("lighting-darkvision-strength-value"),
+    lightingFovStatus: document.getElementById("lighting-fov-status"),
+    lightingFovRebuild: document.getElementById("lighting-fov-rebuild"),
     lightingSourceId: document.getElementById("lighting-source-id"),
     lightingSourceName: document.getElementById("lighting-source-name"),
     lightingSourceBright: document.getElementById("lighting-source-bright"),
@@ -337,8 +339,10 @@
       pendingPlacement: null,
       tokenInfoTokenId: null,
       tokenConfigTokenId: null,
-      blockerCacheKey: "",
-      blockerCache: null,
+      fovDecodedCacheKey: "",
+      fovDecodedCache: new Map(),
+      illuminationCacheKey: "",
+      illuminationCache: null,
       visibilityCacheKey: "",
       visibilityCache: null,
     },
@@ -605,6 +609,197 @@
 
   function lightingSources(map = activeMap()) {
     return lightingSettings(map).sources;
+  }
+
+  function fovCacheForMap(map = activeMap()) {
+    return map && map.fovCache && typeof map.fovCache === "object" ? map.fovCache : null;
+  }
+
+  function fovCacheSignature(map = activeMap()) {
+    const cache = fovCacheForMap(map);
+    if (!cache || !cache.sets) {
+      return "none";
+    }
+    return [
+      cache.version || "",
+      cache.algorithm || "",
+      cache.rows || "",
+      cache.cols || "",
+      cache.originByteLength || "",
+      cache.terrainHash || "",
+      cache.builtAt || "",
+    ].join(":");
+  }
+
+  function fovCacheHasSet(map, kind) {
+    const cache = fovCacheForMap(map);
+    if (
+      !cache ||
+      Number(cache.version) !== 1 ||
+      Number(cache.rows) !== Number(map && map.rows) ||
+      Number(cache.cols) !== Number(map && map.cols)
+    ) {
+      return false;
+    }
+    const sets = cache.sets && typeof cache.sets === "object" ? cache.sets : {};
+    const record = sets[kind];
+    if (!record || typeof record !== "object") {
+      return false;
+    }
+    if (record.sameAs) {
+      const target = sets[record.sameAs];
+      return Boolean(target && typeof target.data === "string" && target.data.length > 0);
+    }
+    return typeof record.data === "string" && record.data.length > 0;
+  }
+
+  function fovCacheReady(map = activeMap()) {
+    return Boolean(map && fovCacheHasSet(map, "vision") && fovCacheHasSet(map, "light"));
+  }
+
+  function decodeBase64Bytes(value) {
+    const binary = window.atob(String(value || ""));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
+  }
+
+  function readVarUint(bytes, startCursor) {
+    let value = 0;
+    let shift = 0;
+    let cursor = startCursor;
+    while (cursor < bytes.length) {
+      const byte = bytes[cursor];
+      cursor += 1;
+      value |= (byte & 0x7f) << shift;
+      if ((byte & 0x80) === 0) {
+        return { value, cursor };
+      }
+      shift += 7;
+    }
+    return { value: 0, cursor };
+  }
+
+  function decodeRleBytes(bytes, expectedLength) {
+    const out = new Uint8Array(expectedLength);
+    let cursor = 0;
+    let target = 0;
+    while (cursor < bytes.length && target < expectedLength) {
+      const result = readVarUint(bytes, cursor);
+      cursor = result.cursor;
+      const value = bytes[cursor] || 0;
+      cursor += 1;
+      out.fill(value, target, Math.min(expectedLength, target + result.value));
+      target += result.value;
+    }
+    return out;
+  }
+
+  function decodeFovRecord(record, expectedLength) {
+    if (!record || typeof record.data !== "string") {
+      return new Uint8Array(expectedLength);
+    }
+    const encoded = decodeBase64Bytes(record.data);
+    if (record.encoding === "rle-byte-base64-v1") {
+      return decodeRleBytes(encoded, expectedLength);
+    }
+    if (encoded.length === expectedLength) {
+      return encoded;
+    }
+    const out = new Uint8Array(expectedLength);
+    out.set(encoded.slice(0, expectedLength));
+    return out;
+  }
+
+  function decodedFovSet(map, kind) {
+    const cache = fovCacheForMap(map);
+    if (!cache || !cache.sets) {
+      return null;
+    }
+    const signature = fovCacheSignature(map);
+    if (state.lightingUi.fovDecodedCacheKey !== signature) {
+      state.lightingUi.fovDecodedCacheKey = signature;
+      state.lightingUi.fovDecodedCache.clear();
+    }
+    const normalizedKind = kind === "light" ? "light" : "vision";
+    if (state.lightingUi.fovDecodedCache.has(normalizedKind)) {
+      return state.lightingUi.fovDecodedCache.get(normalizedKind);
+    }
+    const total = Number(cache.total) || Number(cache.rows) * Number(cache.cols);
+    const stride = Number(cache.originByteLength) || Math.ceil(total / 8);
+    const record = cache.sets[normalizedKind];
+    if (!record) {
+      return null;
+    }
+    if (record.sameAs) {
+      const shared = decodedFovSet(map, record.sameAs);
+      if (shared) {
+        state.lightingUi.fovDecodedCache.set(normalizedKind, shared);
+      }
+      return shared;
+    }
+    const decoded = {
+      bytes: decodeFovRecord(record, total * stride),
+      total,
+      stride,
+    };
+    state.lightingUi.fovDecodedCache.set(normalizedKind, decoded);
+    return decoded;
+  }
+
+  function hasCachedLineOfSight(map, originX, originY, targetX, targetY, kind) {
+    if (
+      !map ||
+      originX < 0 ||
+      originY < 0 ||
+      targetX < 0 ||
+      targetY < 0 ||
+      originX >= map.cols ||
+      targetX >= map.cols ||
+      originY >= map.rows ||
+      targetY >= map.rows
+    ) {
+      return false;
+    }
+    const decoded = decodedFovSet(map, kind);
+    if (!decoded) {
+      return false;
+    }
+    const originIndex = mapCellIndex(map, originX, originY);
+    const targetIndex = mapCellIndex(map, targetX, targetY);
+    const byteIndex = originIndex * decoded.stride + (targetIndex >> 3);
+    return (decoded.bytes[byteIndex] & (1 << (targetIndex & 7))) !== 0;
+  }
+
+  function fovCacheStatusText(map = activeMap()) {
+    const cache = fovCacheForMap(map);
+    if (!map) {
+      return "No map";
+    }
+    if (!cache || !fovCacheReady(map)) {
+      return "Pending";
+    }
+    if (cache.rebuilding) {
+      return "Rebuilding";
+    }
+    if (cache.stale) {
+      if (cache.nextRebuildAt) {
+        const date = new Date(cache.nextRebuildAt);
+        if (!Number.isNaN(date.getTime())) {
+          return `Stale; rebuild ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+        }
+      }
+      return "Stale";
+    }
+    if (cache.builtAt) {
+      const date = new Date(cache.builtAt);
+      if (!Number.isNaN(date.getTime())) {
+        return `Ready ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+      }
+    }
+    return "Ready";
   }
 
   async function normalizeMapBackgroundDataUrl(file) {
@@ -3603,6 +3798,12 @@
     if (elements.lightingDarkvisionStrength && document.activeElement !== elements.lightingDarkvisionStrength) {
       elements.lightingDarkvisionStrength.value = String(lighting.darkvisionAlpha);
     }
+    if (elements.lightingFovStatus) {
+      elements.lightingFovStatus.textContent = fovCacheStatusText();
+    }
+    if (elements.lightingFovRebuild) {
+      elements.lightingFovRebuild.disabled = !activeMap();
+    }
     updateLightingLabels();
     const selectedSource = selectedLightingSource();
     if (selectedSource) {
@@ -4215,141 +4416,8 @@
     });
   }
 
-  function isTerrainComponentBlockingVision(component) {
-    if (!component || component.layerType !== "foreground" || !component.tile) {
-      return false;
-    }
-    if (component.tile.kind === "door") {
-      return !component.tile.doorOpen && component.tile.blocksVision !== false;
-    }
-    return component.tile.blocksVision === true;
-  }
-
-  function isTerrainComponentBlockingLight(component) {
-    if (!component || component.layerType !== "foreground" || !component.tile) {
-      return false;
-    }
-    if (component.tile.kind === "door") {
-      return !component.tile.doorOpen && component.tile.blocksLight !== false;
-    }
-    return component.tile.blocksLight === true;
-  }
-
   function mapCellIndex(map, x, y) {
     return y * map.cols + x;
-  }
-
-  function buildVisibilityBlockers(map) {
-    const cacheKey = map ? `${map.id}:${map.updatedAt || ""}:blockers` : "";
-    if (state.lightingUi.blockerCacheKey === cacheKey && state.lightingUi.blockerCache) {
-      return state.lightingUi.blockerCache;
-    }
-    const total = map.rows * map.cols;
-    const vision = new Uint8Array(total);
-    const light = new Uint8Array(total);
-    for (let y = 0; y < map.rows; y += 1) {
-      for (let x = 0; x < map.cols; x += 1) {
-        const index = mapCellIndex(map, x, y);
-        const blockers = terrainBlockerFlagsAt(x, y, map);
-        if (blockers.vision) {
-          vision[index] = 1;
-        }
-        if (blockers.light) {
-          light[index] = 1;
-        }
-      }
-    }
-    state.lightingUi.blockerCacheKey = cacheKey;
-    state.lightingUi.blockerCache = { vision, light };
-    return state.lightingUi.blockerCache;
-  }
-
-  function hasLineOfSight(map, originX, originY, targetX, targetY, blockers) {
-    if (
-      originX < 0 ||
-      originY < 0 ||
-      originX >= map.cols ||
-      originY >= map.rows ||
-      targetX < 0 ||
-      targetY < 0 ||
-      targetX >= map.cols ||
-      targetY >= map.rows
-    ) {
-      return false;
-    }
-    if (originX === targetX && originY === targetY) {
-      return true;
-    }
-
-    const startX = originX + 0.5;
-    const startY = originY + 0.5;
-    const endX = targetX + 0.5;
-    const endY = targetY + 0.5;
-    const deltaX = endX - startX;
-    const deltaY = endY - startY;
-    const stepX = deltaX === 0 ? 0 : deltaX > 0 ? 1 : -1;
-    const stepY = deltaY === 0 ? 0 : deltaY > 0 ? 1 : -1;
-    const absDeltaX = Math.abs(deltaX);
-    const absDeltaY = Math.abs(deltaY);
-
-    let currentX = originX;
-    let currentY = originY;
-
-    const blocks = (cellX, cellY) => {
-      if (cellX < 0 || cellY < 0 || cellX >= map.cols || cellY >= map.rows) {
-        return true;
-      }
-      if (cellX === targetX && cellY === targetY) {
-        return false;
-      }
-      return blockers[mapCellIndex(map, cellX, cellY)] === 1;
-    };
-
-    let tMaxX = Number.POSITIVE_INFINITY;
-    let tMaxY = Number.POSITIVE_INFINITY;
-    let tDeltaX = Number.POSITIVE_INFINITY;
-    let tDeltaY = Number.POSITIVE_INFINITY;
-
-    if (stepX !== 0) {
-      const nextBoundaryX = stepX > 0 ? currentX + 1 : currentX;
-      tMaxX = Math.abs((nextBoundaryX - startX) / deltaX);
-      tDeltaX = 1 / absDeltaX;
-    }
-    if (stepY !== 0) {
-      const nextBoundaryY = stepY > 0 ? currentY + 1 : currentY;
-      tMaxY = Math.abs((nextBoundaryY - startY) / deltaY);
-      tDeltaY = 1 / absDeltaY;
-    }
-
-    for (let steps = 0; steps < map.rows * map.cols; steps += 1) {
-      if (tMaxX < tMaxY) {
-        currentX += stepX;
-        tMaxX += tDeltaX;
-      } else if (tMaxY < tMaxX) {
-        currentY += stepY;
-        tMaxY += tDeltaY;
-      } else {
-        if (
-          (stepX !== 0 && blocks(currentX + stepX, currentY)) ||
-          (stepY !== 0 && blocks(currentX, currentY + stepY))
-        ) {
-          return false;
-        }
-        currentX += stepX;
-        currentY += stepY;
-        tMaxX += tDeltaX;
-        tMaxY += tDeltaY;
-      }
-
-      if (currentX === targetX && currentY === targetY) {
-        return true;
-      }
-      if (blocks(currentX, currentY)) {
-        return false;
-      }
-    }
-
-    return false;
   }
 
   function collectLightSources(map) {
@@ -4385,8 +4453,41 @@
     return sources;
   }
 
-  function computeIlluminationGrid(map, blockers) {
+  function lightSourceSignature(map) {
+    return JSON.stringify(
+      collectLightSources(map).map((source) => ({
+        id: source.id,
+        kind: source.kind,
+        x: source.x,
+        y: source.y,
+        brightRadius: source.brightRadius,
+        dimRadius: source.dimRadius,
+      }))
+    );
+  }
+
+  function viewerVisionSignature(map) {
+    return JSON.stringify(
+      (map.tokens || [])
+        .filter((token) => token && token.layer === "tokens" && canCurrentUserControlToken(token))
+        .map((token) => {
+          const vision = normalizeTokenVisionConfig(token.vision);
+          return {
+            id: token.id,
+            x: token.x,
+            y: token.y,
+            darkvisionRadius: vision.darkvisionRadius,
+          };
+        })
+        .sort((a, b) => String(a.id || "").localeCompare(String(b.id || "")))
+    );
+  }
+
+  function computeIlluminationGrid(map) {
     const illumination = new Uint8Array(map.rows * map.cols);
+    if (!fovCacheHasSet(map, "light")) {
+      return illumination;
+    }
     const feetPerCell = feetPerSquare(map);
     collectLightSources(map).forEach((source) => {
       const brightRadiusSquares = source.brightRadius / feetPerCell;
@@ -4408,7 +4509,7 @@
           if (distSq > totalSq + 0.0001) {
             continue;
           }
-          if (!hasLineOfSight(map, source.x, source.y, x, y, blockers)) {
+          if (!hasCachedLineOfSight(map, source.x, source.y, x, y, "light")) {
             continue;
           }
           const index = mapCellIndex(map, x, y);
@@ -4421,6 +4522,19 @@
       }
     });
     return illumination;
+  }
+
+  function illuminationStateForMap(map) {
+    const cacheKey = map
+      ? `${map.id}:${fovCacheSignature(map)}:${lightSourceSignature(map)}`
+      : "";
+    if (state.lightingUi.illuminationCacheKey === cacheKey && state.lightingUi.illuminationCache) {
+      return state.lightingUi.illuminationCache;
+    }
+    const next = map ? computeIlluminationGrid(map) : null;
+    state.lightingUi.illuminationCacheKey = cacheKey;
+    state.lightingUi.illuminationCache = next;
+    return next;
   }
 
   function computePlayerVisibility(map) {
@@ -4439,12 +4553,14 @@
       return { cells: visible, illumination: new Uint8Array(total) };
     }
 
-    const blockers = buildVisibilityBlockers(map);
-    const illumination = computeIlluminationGrid(map, blockers.light);
+    const illumination = illuminationStateForMap(map) || new Uint8Array(total);
     const viewerTokens = (map.tokens || []).filter(
       (token) => token && token.layer === "tokens" && canCurrentUserControlToken(token)
     );
     if (viewerTokens.length === 0) {
+      return { cells: visible, illumination };
+    }
+    if (!fovCacheHasSet(map, "vision")) {
       return { cells: visible, illumination };
     }
 
@@ -4458,7 +4574,7 @@
       for (let y = 0; y < map.rows; y += 1) {
         for (let x = 0; x < map.cols; x += 1) {
           const index = mapCellIndex(map, x, y);
-          if (!hasLineOfSight(map, token.x, token.y, x, y, blockers.vision)) {
+          if (!hasCachedLineOfSight(map, token.x, token.y, x, y, "vision")) {
             continue;
           }
           if (illumination[index] > 0) {
@@ -4481,10 +4597,18 @@
   }
 
   function visibilityStateForMap(map) {
-    const cacheKey =
-      map && state.snapshot && state.snapshot.auth
-        ? `${map.id}:${map.updatedAt || ""}:${state.snapshot.auth.campaignRole || ""}:${userId() || ""}`
-        : "";
+    const lighting = lightingSettings(map);
+    const cacheKey = map && state.snapshot && state.snapshot.auth
+      ? [
+        map.id,
+        lighting.mode,
+        state.snapshot.auth.campaignRole || "",
+        userId() || "",
+        fovCacheSignature(map),
+        lightSourceSignature(map),
+        viewerVisionSignature(map),
+      ].join("|")
+      : "";
     if (state.lightingUi.visibilityCacheKey === cacheKey && state.lightingUi.visibilityCache) {
       return state.lightingUi.visibilityCache;
     }
@@ -6680,6 +6804,15 @@
     };
     elements.lightingDarkvisionStrength.addEventListener("input", syncDarkvision);
     elements.lightingDarkvisionStrength.addEventListener("change", syncDarkvision);
+  }
+  if (elements.lightingFovRebuild) {
+    elements.lightingFovRebuild.addEventListener("click", () => {
+      if (!activeMap()) {
+        return;
+      }
+      emit("lighting:fovRebuild", {});
+      setStatus("Rebuilding FOV cache...");
+    });
   }
   if (elements.lightingSourceArm) {
     elements.lightingSourceArm.addEventListener("click", () => {

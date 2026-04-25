@@ -2,6 +2,14 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const {
+  FOV_CACHE_REBUILD_INTERVAL_MS,
+  createFovCacheForMap,
+  fovCacheHasUsableData,
+  fovCacheNeedsRebuild,
+  markFovCacheStale,
+  normalizeFovCacheShape,
+} = require("./fov");
+const {
   DEFAULT_TERRAIN_TEXTURE_ROOT,
   applyTerrainOps,
   buildResolvedTextureDefaults,
@@ -34,6 +42,12 @@ const DEFAULT_DARKVISION_TINT = "#6f89b8";
 const DEFAULT_DARKVISION_TINT_ALPHA = 0.42;
 const DEFAULT_TOKEN_AURA_COLOR = "#59a8ff";
 const MAX_LIGHT_RADIUS_FEET = 10_000;
+const TOKEN_SIZE_SQUARES = {
+  medium: 1,
+  large: 2,
+  huge: 3,
+  gargantuan: 4,
+};
 let activeTextureCatalog = buildTextureCatalog(DEFAULT_TERRAIN_TEXTURE_ROOT);
 
 const ROLL_MODIFIER_CATALOG = {
@@ -332,11 +346,51 @@ function normalizeTokenVisionConfig(vision) {
   };
 }
 
+function normalizeTokenSize(value) {
+  const normalized = normalizeSkillName(value);
+  if (TOKEN_SIZE_SQUARES[normalized]) {
+    return normalized;
+  }
+  const numeric = Number.parseInt(value, 10);
+  if (numeric === 2) {
+    return "large";
+  }
+  if (numeric === 3) {
+    return "huge";
+  }
+  if (numeric === 4) {
+    return "gargantuan";
+  }
+  if (/gargantuan|garg/.test(normalized)) {
+    return "gargantuan";
+  }
+  if (/\bhuge\b/.test(normalized)) {
+    return "huge";
+  }
+  if (/\blarge\b/.test(normalized)) {
+    return "large";
+  }
+  return "medium";
+}
+
+function tokenSizeSquares(value) {
+  return TOKEN_SIZE_SQUARES[normalizeTokenSize(value)] || 1;
+}
+
+function clampTokenAnchorToMap(token, map) {
+  if (!token || !map) {
+    return;
+  }
+  const size = tokenSizeSquares(token.tokenSize);
+  token.x = clamp(Number.parseInt(token.x, 10) || 0, 0, Math.max(0, Number(map.cols) - size));
+  token.y = clamp(Number.parseInt(token.y, 10) || 0, 0, Math.max(0, Number(map.rows) - size));
+}
+
 function normalizeMapTokenShape(token, map) {
   if (!token || typeof token !== "object") {
     return null;
   }
-  return {
+  const normalized = {
     ...token,
     id: String(token.id || createId("token")),
     name: String(token.name || "Token").slice(0, 120),
@@ -344,9 +398,10 @@ function normalizeMapTokenShape(token, map) {
     sourceId: String(token.sourceId || ""),
     ownerUserId: token.ownerUserId || null,
     tokenImage: String(token.tokenImage || ""),
+    tokenSize: normalizeTokenSize(token.tokenSize || token.size),
     layer: token.layer === "gm" ? "gm" : "tokens",
-    x: clamp(Number.parseInt(token.x, 10) || 0, 0, Math.max(0, Number(map && map.cols) - 1)),
-    y: clamp(Number.parseInt(token.y, 10) || 0, 0, Math.max(0, Number(map && map.rows) - 1)),
+    x: Number.parseInt(token.x, 10) || 0,
+    y: Number.parseInt(token.y, 10) || 0,
     movementMax: Math.max(0, Number.parseInt(token.movementMax, 10) || 30),
     initiativeMod: Number.parseInt(token.initiativeMod, 10) || 0,
     autoMove: Boolean(token.autoMove),
@@ -361,6 +416,8 @@ function normalizeMapTokenShape(token, map) {
         : null,
     vision: normalizeTokenVisionConfig(token.vision),
   };
+  clampTokenAnchorToMap(normalized, map);
+  return normalized;
 }
 
 function normalizeSkillName(name) {
@@ -1054,6 +1111,7 @@ function resizeMapInPlace(map, rows, cols, textureCatalog = activeTextureCatalog
       token.vision = normalizeTokenVisionConfig(token.vision);
     });
   }
+  map.fovCache = normalizeFovCacheShape(map.fovCache, map);
 }
 
 function createMap({ name, rows, cols, feetPerCell = 5, textureCatalog = activeTextureCatalog }) {
@@ -1076,10 +1134,12 @@ function createMap({ name, rows, cols, feetPerCell = 5, textureCatalog = activeT
     terrainLayers: [],
     tokens: [],
     drawings: [],
+    fovCache: null,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
   ensureTerrainLayers(map, textureCatalog, createId);
+  map.fovCache = normalizeFovCacheShape(map.fovCache, map);
   return map;
 }
 
@@ -1517,6 +1577,7 @@ function normalizeMapShape(map) {
     map.background.imageDataUrl = "";
   }
   ensureTerrainLayers(map, activeTextureCatalog, createId);
+  map.fovCache = normalizeFovCacheShape(map.fovCache, map);
   if (!Array.isArray(map.tokens)) {
     map.tokens = [];
   } else {
@@ -2681,6 +2742,93 @@ function createTabletopSystem(io, options = {}) {
   }
 
   const namespace = io.of(TABLETOP_NAMESPACE);
+  const fovRebuildTimers = new Map();
+
+  function fovRebuildTimerKey(campaign, map) {
+    return `${campaign && campaign.id ? campaign.id : "campaign"}:${map && map.id ? map.id : "map"}`;
+  }
+
+  function clearFovRebuildTimer(campaign, map) {
+    const key = fovRebuildTimerKey(campaign, map);
+    const timer = fovRebuildTimers.get(key);
+    if (timer) {
+      clearTimeout(timer);
+      fovRebuildTimers.delete(key);
+    }
+  }
+
+  function rebuildMapFovCache(campaign, map, { force = false } = {}) {
+    if (!campaign || !map) {
+      return false;
+    }
+    map.fovCache = normalizeFovCacheShape(map.fovCache, map);
+    if (!force && !fovCacheNeedsRebuild(map)) {
+      return false;
+    }
+    clearFovRebuildTimer(campaign, map);
+    map.fovCache.rebuilding = true;
+    map.fovCache.nextRebuildAt = null;
+    map.fovCache = createFovCacheForMap(map, new Date());
+    map.updatedAt = nowIso();
+    campaign.updatedAt = nowIso();
+    persistence.saveSoon();
+    broadcastSnapshots();
+    return true;
+  }
+
+  function scheduleMapFovCacheRebuild(campaign, map) {
+    if (!campaign || !map) {
+      return;
+    }
+    map.fovCache = normalizeFovCacheShape(map.fovCache, map);
+    if (!fovCacheNeedsRebuild(map)) {
+      map.fovCache.stale = false;
+      map.fovCache.nextRebuildAt = null;
+      return;
+    }
+
+    const key = fovRebuildTimerKey(campaign, map);
+    if (fovRebuildTimers.has(key)) {
+      return;
+    }
+
+    const hasUsableCache =
+      fovCacheHasUsableData(map.fovCache, "vision") && fovCacheHasUsableData(map.fovCache, "light");
+    const builtAtMs = Date.parse(map.fovCache.builtAt || "");
+    const earliestMs = hasUsableCache && Number.isFinite(builtAtMs)
+      ? builtAtMs + FOV_CACHE_REBUILD_INTERVAL_MS
+      : Date.now();
+    const delayMs = Math.max(0, earliestMs - Date.now());
+    map.fovCache.nextRebuildAt = new Date(Date.now() + delayMs).toISOString();
+    map.fovCache.rebuilding = false;
+
+    const timer = setTimeout(() => {
+      fovRebuildTimers.delete(key);
+      if (!campaign.maps.includes(map)) {
+        return;
+      }
+      rebuildMapFovCache(campaign, map);
+    }, delayMs);
+    fovRebuildTimers.set(key, timer);
+    persistence.saveSoon();
+  }
+
+  function markMapFovCacheStaleAndSchedule(campaign, map, reason) {
+    if (!campaign || !map) {
+      return;
+    }
+    markFovCacheStale(map, reason, new Date());
+    scheduleMapFovCacheRebuild(campaign, map);
+  }
+
+  function scheduleInitialFovCacheRebuilds() {
+    state.campaigns.forEach((campaign) => {
+      campaign.maps.forEach((map) => {
+        map.fovCache = normalizeFovCacheShape(map.fovCache, map);
+        scheduleMapFovCacheRebuild(campaign, map);
+      });
+    });
+  }
 
   async function refreshHerbs() {
     try {
@@ -2694,6 +2842,7 @@ function createTabletopSystem(io, options = {}) {
     }
   }
 
+  scheduleInitialFovCacheRebuilds();
   refreshHerbs();
 
   namespace.on("connection", (socket) => {
@@ -3171,6 +3320,7 @@ function createTabletopSystem(io, options = {}) {
       });
       campaign.maps.push(map);
       campaign.scene.activeMapId = map.id;
+      scheduleMapFovCacheRebuild(campaign, map);
       appendSystemLog(campaign, socket, `Created map ${map.name}.`);
       persistence.saveSoon();
       broadcastSnapshots();
@@ -3191,6 +3341,7 @@ function createTabletopSystem(io, options = {}) {
         return;
       }
       const deleted = campaign.maps[index];
+      clearFovRebuildTimer(campaign, deleted);
       campaign.maps.splice(index, 1);
       if (campaign.scene.activeMapId === id) {
         campaign.scene.activeMapId = campaign.maps[0].id;
@@ -3212,6 +3363,7 @@ function createTabletopSystem(io, options = {}) {
         return;
       }
       campaign.scene.activeMapId = id;
+      scheduleMapFovCacheRebuild(campaign, map);
       persistence.saveSoon();
       broadcastSnapshots();
     });
@@ -3230,6 +3382,8 @@ function createTabletopSystem(io, options = {}) {
         socket.emit("tabletop:error", { message: "Map not found." });
         return;
       }
+      const previousRows = map.rows;
+      const previousCols = map.cols;
 
       if (payload && payload.name !== undefined) {
         const wantedName = String(payload.name || "").trim().slice(0, 120);
@@ -3274,6 +3428,9 @@ function createTabletopSystem(io, options = {}) {
           0,
           0.95
         );
+      }
+      if (map.rows !== previousRows || map.cols !== previousCols) {
+        markMapFovCacheStaleAndSchedule(campaign, map, "Map dimensions changed.");
       }
       map.updatedAt = nowIso();
       campaign.updatedAt = nowIso();
@@ -3356,6 +3513,21 @@ function createTabletopSystem(io, options = {}) {
       campaign.updatedAt = nowIso();
       persistence.saveSoon();
       broadcastSnapshots();
+    });
+
+    socket.on("lighting:fovRebuild", () => {
+      if (!requireDm(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map) {
+        return;
+      }
+      const rebuilt = rebuildMapFovCache(campaign, map, { force: true });
+      socket.emit("tabletop:notice", {
+        message: rebuilt ? "FOV cache rebuilt." : "FOV cache is already current.",
+      });
     });
 
     socket.on("map:setBackground", (payload) => {
@@ -3523,6 +3695,9 @@ function createTabletopSystem(io, options = {}) {
             ? "gm"
             : "background";
       createLayerOnMap(map, layerType, createId, activeTextureCatalog);
+      if (layerType === "foreground") {
+        markMapFovCacheStaleAndSchedule(campaign, map, "Foreground terrain layer created.");
+      }
       map.updatedAt = nowIso();
       campaign.updatedAt = nowIso();
       persistence.saveSoon();
@@ -3542,8 +3717,12 @@ function createTabletopSystem(io, options = {}) {
       if (!layer) {
         return;
       }
+      const previousVisible = layer.visible !== false;
       if (payload && payload.visible !== undefined) {
         layer.visible = Boolean(payload.visible);
+      }
+      if (layer.type === "foreground" && previousVisible !== (layer.visible !== false)) {
+        markMapFovCacheStaleAndSchedule(campaign, map, "Foreground terrain visibility changed.");
       }
       map.updatedAt = nowIso();
       campaign.updatedAt = nowIso();
@@ -3560,10 +3739,15 @@ function createTabletopSystem(io, options = {}) {
       if (!map) {
         return;
       }
+      const layer = getTerrainLayerById(map, payload && payload.layerId);
+      const affectsFov = Boolean(layer && layer.type === "foreground");
       const result = deleteLayerFromMap(map, payload && payload.layerId);
       if (!result.ok) {
         socket.emit("tabletop:error", { message: result.reason || "Could not delete layer." });
         return;
+      }
+      if (affectsFov) {
+        markMapFovCacheStaleAndSchedule(campaign, map, "Foreground terrain layer deleted.");
       }
       map.updatedAt = nowIso();
       campaign.updatedAt = nowIso();
@@ -3583,6 +3767,9 @@ function createTabletopSystem(io, options = {}) {
       const ok = reorderLayersOnMap(map, payload && payload.orderedLayerIds);
       if (!ok) {
         return;
+      }
+      if ((map.terrainLayers || []).some((layer) => layer && layer.type === "foreground")) {
+        markMapFovCacheStaleAndSchedule(campaign, map, "Terrain layer order changed.");
       }
       map.updatedAt = nowIso();
       campaign.updatedAt = nowIso();
@@ -3630,6 +3817,10 @@ function createTabletopSystem(io, options = {}) {
         socket.emit("tabletop:error", { message: result.reason || "Could not apply terrain edits." });
         return;
       }
+      const layer = getTerrainLayerById(map, result.layerId);
+      if (layer && layer.type === "foreground") {
+        markMapFovCacheStaleAndSchedule(campaign, map, "Foreground terrain changed.");
+      }
       map.updatedAt = nowIso();
       campaign.updatedAt = nowIso();
       persistence.saveSoon();
@@ -3667,6 +3858,7 @@ function createTabletopSystem(io, options = {}) {
       } else if (!door.tile.doorLocked) {
         door.tile.doorOpen = !door.tile.doorOpen;
       }
+      markMapFovCacheStaleAndSchedule(campaign, map, "Door state changed.");
       map.updatedAt = nowIso();
       campaign.updatedAt = nowIso();
       persistence.saveSoon();
