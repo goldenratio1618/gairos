@@ -11,6 +11,18 @@
   const DEFAULT_DARKVISION_TINT_ALPHA = 0.42;
   const DEFAULT_TOKEN_AURA_COLOR = "#59a8ff";
   const MAX_LIGHT_RADIUS_FEET = 10_000;
+  const TOKEN_SIZE_SQUARES = {
+    medium: 1,
+    large: 2,
+    huge: 3,
+    gargantuan: 4,
+  };
+  const TOKEN_SIZE_LABELS = {
+    medium: "Medium (1x1)",
+    large: "Large (2x2)",
+    huge: "Huge (3x3)",
+    gargantuan: "Gargantuan (4x4)",
+  };
 
   const elements = {
     root: document.getElementById("tabletop-root"),
@@ -225,6 +237,7 @@
     tokenConfigModal: document.getElementById("token-config-modal"),
     tokenConfigTitle: document.getElementById("token-config-title"),
     tokenConfigTokenId: document.getElementById("token-config-token-id"),
+    tokenConfigSize: document.getElementById("token-config-size"),
     tokenConfigBright: document.getElementById("token-config-bright"),
     tokenConfigDim: document.getElementById("token-config-dim"),
     tokenConfigDarkvision: document.getElementById("token-config-darkvision"),
@@ -1805,7 +1818,10 @@
       if (!canCurrentUserControlToken(token)) {
         return;
       }
-      if (token.x >= col1 && token.x <= col2 && token.y >= row1 && token.y <= row2) {
+      const size = tokenSizeSquares(token);
+      const tokenRight = token.x + size - 1;
+      const tokenBottom = token.y + size - 1;
+      if (tokenRight >= col1 && token.x <= col2 && tokenBottom >= row1 && token.y <= row2) {
         state.selectedTokenIds.add(token.id);
       }
     });
@@ -2706,6 +2722,43 @@
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
+  }
+
+  function normalizeTokenSize(value) {
+    const normalized = normalizeLabel(value);
+    if (TOKEN_SIZE_SQUARES[normalized]) {
+      return normalized;
+    }
+    const numeric = Number.parseInt(value, 10);
+    if (numeric === 2) {
+      return "large";
+    }
+    if (numeric === 3) {
+      return "huge";
+    }
+    if (numeric === 4) {
+      return "gargantuan";
+    }
+    if (/gargantuan|garg/.test(normalized)) {
+      return "gargantuan";
+    }
+    if (/\bhuge\b/.test(normalized)) {
+      return "huge";
+    }
+    if (/\blarge\b/.test(normalized)) {
+      return "large";
+    }
+    return "medium";
+  }
+
+  function tokenSizeSquares(tokenOrSize) {
+    const value = tokenOrSize && typeof tokenOrSize === "object" ? tokenOrSize.tokenSize : tokenOrSize;
+    return TOKEN_SIZE_SQUARES[normalizeTokenSize(value)] || 1;
+  }
+
+  function tokenSizeLabel(value) {
+    const size = normalizeTokenSize(value && typeof value === "object" ? value.tokenSize : value);
+    return TOKEN_SIZE_LABELS[size] || TOKEN_SIZE_LABELS.medium;
   }
 
   function formatStatKey(key) {
@@ -4856,15 +4909,18 @@
     }
 
     map.tokens.forEach((token) => {
+      const tokenSize = tokenSizeSquares(token);
       const tokenVision = normalizeTokenVisionConfig(token.vision);
       const cellState = visibilityState ? visibilityState.cells[mapCellIndex(map, token.x, token.y)] : 3;
       const isVisibleToViewer = isDm() || cellState > 0;
       const holder = document.createElement("div");
       holder.className = "tt-token-holder";
       holder.style.gridColumnStart = String(token.x + 1);
+      holder.style.gridColumnEnd = `span ${tokenSize}`;
       holder.style.gridRowStart = String(token.y + 1);
-      holder.style.width = `${cellSize}px`;
-      holder.style.height = `${cellSize}px`;
+      holder.style.gridRowEnd = `span ${tokenSize}`;
+      holder.style.width = `${cellSize * tokenSize + Math.max(0, tokenSize - 1)}px`;
+      holder.style.height = `${cellSize * tokenSize + Math.max(0, tokenSize - 1)}px`;
       holder.style.position = "relative";
       const canClickToken = isVisibleToViewer && canCurrentUserInspectToken(token) && isTokenInteractionAllowed();
       holder.style.pointerEvents = canClickToken ? "auto" : "none";
@@ -4976,12 +5032,7 @@
       });
 
       tokenEl.addEventListener("dblclick", (event) => {
-        if (
-          !isDm() ||
-          !isTokenInteractionAllowed() ||
-          token.sourceType !== "character" ||
-          !token.ownerUserId
-        ) {
+        if (!isDm() || !isTokenInteractionAllowed()) {
           return;
         }
         event.preventDefault();
@@ -4990,7 +5041,9 @@
       });
 
       if (canCurrentUserControlToken(token) && isTokenInteractionAllowed()) {
-        tokenEl.title = "Click for info and selection. Drag or use arrow keys to move.";
+        tokenEl.title = isDm()
+          ? "Click for info and selection. Double-click for token settings. Drag or use arrow keys to move."
+          : "Click for info and selection. Drag or use arrow keys to move.";
       } else if (canCurrentUserInspectToken(token)) {
         tokenEl.title = "Click for token info.";
       } else {
@@ -5255,6 +5308,7 @@
       { key: "Current Mana", value: readStat("current mana", "mana") },
       { key: "Speed", value: readStat("speed") || token.movementMax },
       { key: "Initiative", value: token.initiativeMod },
+      { key: "Size", value: tokenSizeLabel(token) },
       { key: "Bright Light", value: vision.brightRadius ? `${vision.brightRadius} ft` : "-" },
       { key: "Dim Light", value: vision.dimRadius ? `${vision.dimRadius} ft` : "-" },
       { key: "Darkvision", value: vision.darkvisionRadius ? `${vision.darkvisionRadius} ft` : "-" },
@@ -5286,10 +5340,13 @@
     const vision = normalizeTokenVisionConfig(token.vision);
     state.lightingUi.tokenConfigTokenId = token.id;
     if (elements.tokenConfigTitle) {
-      elements.tokenConfigTitle.textContent = `${token.name} Lighting`;
+      elements.tokenConfigTitle.textContent = `${token.name} Settings`;
     }
     if (elements.tokenConfigTokenId) {
       elements.tokenConfigTokenId.value = token.id;
+    }
+    if (elements.tokenConfigSize) {
+      elements.tokenConfigSize.value = normalizeTokenSize(token.tokenSize);
     }
     if (elements.tokenConfigBright) {
       elements.tokenConfigBright.value = String(vision.brightRadius || 0);
@@ -5411,7 +5468,8 @@
     }
     const targetX = token.x + dx;
     const targetY = token.y + dy;
-    if (targetX < 0 || targetX >= map.cols || targetY < 0 || targetY >= map.rows) {
+    const size = tokenSizeSquares(token);
+    if (targetX < 0 || targetX + size > map.cols || targetY < 0 || targetY + size > map.rows) {
       return false;
     }
     emit("token:move", { tokenId: token.id, x: targetX, y: targetY });
@@ -7000,6 +7058,7 @@
       }
       emit("token:update", {
         tokenId,
+        tokenSize: elements.tokenConfigSize ? elements.tokenConfigSize.value : "medium",
         vision: {
           brightRadius: clampLightRadiusFeet(elements.tokenConfigBright && elements.tokenConfigBright.value),
           dimRadius: clampLightRadiusFeet(elements.tokenConfigDim && elements.tokenConfigDim.value),

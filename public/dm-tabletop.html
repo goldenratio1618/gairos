@@ -580,10 +580,17 @@
       <div class="tt-modal-backdrop" data-close-modal="token-config-modal"></div>
       <div class="tt-modal-card tt-modal-card-small">
         <div class="tt-modal-header">
-          <h2 id="token-config-title">Token Lighting</h2>
+          <h2 id="token-config-title">Token Settings</h2>
           <button id="token-config-close" type="button" class="tt-icon-button">×</button>
         </div>
         <input id="token-config-token-id" type="hidden" />
+        <label class="tt-field" for="token-config-size">Size</label>
+        <select id="token-config-size">
+          <option value="medium">Medium (1x1)</option>
+          <option value="large">Large (2x2)</option>
+          <option value="huge">Huge (3x3)</option>
+          <option value="gargantuan">Gargantuan (4x4)</option>
+        </select>
         <div class="tt-grid2">
           <div>
             <label class="tt-field" for="token-config-bright">Bright Light (ft)</label>

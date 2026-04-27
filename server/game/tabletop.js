@@ -399,6 +399,7 @@ function normalizeMapTokenShape(token, map) {
     ownerUserId: token.ownerUserId || null,
     tokenImage: String(token.tokenImage || ""),
     tokenSize: normalizeTokenSize(token.tokenSize || token.size),
+    tokenSizeManual: Boolean(token.tokenSizeManual),
     layer: token.layer === "gm" ? "gm" : "tokens",
     x: Number.parseInt(token.x, 10) || 0,
     y: Number.parseInt(token.y, 10) || 0,
@@ -973,6 +974,39 @@ function getNumericParsedCurrentValue(parsedSheet, key) {
   return null;
 }
 
+function parsedSheetSizeValue(parsedSheet) {
+  if (!parsedSheet || typeof parsedSheet !== "object") {
+    return "";
+  }
+  if (parsedSheet.size !== undefined) {
+    return parsedSheet.size;
+  }
+  const currentValues = parsedSheet.currentValues && typeof parsedSheet.currentValues === "object"
+    ? parsedSheet.currentValues
+    : {};
+  const matchingValueKey = Object.keys(currentValues).find((candidate) => normalizeSkillName(candidate) === "size");
+  if (matchingValueKey) {
+    return currentValues[matchingValueKey];
+  }
+  const meta = parsedSheet.currentValueMeta && typeof parsedSheet.currentValueMeta === "object"
+    ? parsedSheet.currentValueMeta
+    : {};
+  const matchingMetaKey = Object.keys(meta).find((candidate) => normalizeSkillName(candidate) === "size");
+  if (matchingMetaKey && meta[matchingMetaKey]) {
+    return meta[matchingMetaKey].displayValue || meta[matchingMetaKey].baseRaw || meta[matchingMetaKey].currentRaw || "";
+  }
+  return "";
+}
+
+function normalizeParsedSheetTokenSize(parsedSheet, fallback = "medium") {
+  if (!parsedSheet || typeof parsedSheet !== "object") {
+    return parsedSheet;
+  }
+  const sizeValue = parsedSheetSizeValue(parsedSheet) || parsedSheet.tokenSize || fallback;
+  parsedSheet.tokenSize = normalizeTokenSize(sizeValue);
+  return parsedSheet;
+}
+
 function parseStatblockColumn(rows, columnName) {
   const header = rows[0] || [];
   let index = -1;
@@ -1024,10 +1058,13 @@ function parseStatblockColumn(rows, columnName) {
   });
 
   const displayName = String(rows[0][index] || columnName).replace(/^Name Creature Type\s*/i, "").trim();
+  const rawSize = byName.size !== undefined ? String(byName.size || "").trim() : "";
+  const tokenSize = normalizeTokenSize(rawSize);
   return {
     name: displayName || columnName,
     stats: {
       skills,
+      tokenSize,
       strengthModifier: normalizeNumber(byName.strength, 0),
       resistDamageBonus: normalizeNumber(byName["resist damage"], 0),
       initiativeBonus: normalizeNumber(byName.initiative, 0),
@@ -1036,10 +1073,27 @@ function parseStatblockColumn(rows, columnName) {
       italicizedSkillDc: 0,
       feats: [],
       currentValues: {
+        size: rawSize || tokenSize,
         speed: normalizeNumber(byName.speed, 30),
         "max hp": Math.max(1, normalizeNumber(byName.hp, 1)),
       },
-      currentValueMeta: {},
+      currentValueMeta: rawSize
+        ? {
+          size: {
+            key: "size",
+            rowNumber: null,
+            baseRaw: rawSize,
+            currentRaw: "",
+            baseValue: rawSize,
+            currentValue: "",
+            displayValue: rawSize,
+            hasCurrent: false,
+            hasBase: true,
+            bCell: null,
+            dCell: null,
+          },
+        }
+        : {},
       parsedAt: nowIso(),
     },
   };
@@ -1106,8 +1160,8 @@ function resizeMapInPlace(map, rows, cols, textureCatalog = activeTextureCatalog
   map.lighting = normalizeMapLightingShape(map.lighting, nextRows, nextCols);
   if (Array.isArray(map.tokens)) {
     map.tokens.forEach((token) => {
-      token.x = clamp(Number.parseInt(token.x, 10) || 0, 0, nextCols - 1);
-      token.y = clamp(Number.parseInt(token.y, 10) || 0, 0, nextRows - 1);
+      token.tokenSize = normalizeTokenSize(token.tokenSize || token.size);
+      clampTokenAnchorToMap(token, map);
       token.vision = normalizeTokenVisionConfig(token.vision);
     });
   }
@@ -1206,13 +1260,21 @@ function findTokenById(map, tokenId) {
   return map.tokens.find((token) => token.id === tokenId) || null;
 }
 
+function tokenOccupiesCell(token, x, y, anchorX = Number(token && token.x) || 0, anchorY = Number(token && token.y) || 0) {
+  const size = tokenSizeSquares(token && token.tokenSize);
+  return x >= anchorX && x < anchorX + size && y >= anchorY && y < anchorY + size;
+}
+
 function getTokenAtPosition(map, x, y, excludeTokenId = null) {
   if (!map || !Array.isArray(map.tokens)) {
     return null;
   }
   return (
     map.tokens.find(
-      (token) => token.id !== excludeTokenId && token.layer === "tokens" && token.x === x && token.y === y
+      (token) =>
+        token.id !== excludeTokenId &&
+        token.layer === "tokens" &&
+        tokenOccupiesCell(token, x, y)
     ) || null
   );
 }
@@ -1228,6 +1290,32 @@ function neighbors4(x, y) {
     [x, y + 1],
     [x, y - 1],
   ];
+}
+
+function tokenFootprintCells(token, anchorX = Number(token && token.x) || 0, anchorY = Number(token && token.y) || 0) {
+  const size = tokenSizeSquares(token && token.tokenSize);
+  const cells = [];
+  for (let y = anchorY; y < anchorY + size; y += 1) {
+    for (let x = anchorX; x < anchorX + size; x += 1) {
+      cells.push({ x, y });
+    }
+  }
+  return cells;
+}
+
+function tokenFootprintFits(map, token, anchorX, anchorY) {
+  const size = tokenSizeSquares(token && token.tokenSize);
+  return anchorX >= 0 && anchorY >= 0 && anchorX + size <= map.cols && anchorY + size <= map.rows;
+}
+
+function tokenFootprintHasMovementBlocker(map, token, anchorX, anchorY) {
+  return tokenFootprintCells(token, anchorX, anchorY).some((cell) => isMovementBlockedAt(map, cell.x, cell.y));
+}
+
+function tokenFootprintTouchesOtherToken(map, token, anchorX, anchorY) {
+  return tokenFootprintCells(token, anchorX, anchorY).some((cell) =>
+    getTokenAtPosition(map, cell.x, cell.y, token && token.id)
+  );
 }
 
 function computePathAndCost(map, token, targetX, targetY) {
@@ -1255,15 +1343,15 @@ function computePathAndCost(map, token, targetX, targetY) {
     }
 
     for (const [nx, ny] of neighbors4(current.x, current.y)) {
-      if (nx < 0 || ny < 0 || nx >= map.cols || ny >= map.rows) {
+      if (!tokenFootprintFits(map, token, nx, ny)) {
         continue;
       }
-      if (isMovementBlockedAt(map, nx, ny)) {
+      if (tokenFootprintHasMovementBlocker(map, token, nx, ny)) {
         continue;
       }
 
       let stepCost = 5;
-      if (getTokenAtPosition(map, nx, ny, token.id)) {
+      if (tokenFootprintTouchesOtherToken(map, token, nx, ny)) {
         stepCost *= 2;
       }
 
@@ -1447,6 +1535,7 @@ function parseManualStatblockText(text) {
     currentValues: {},
     currentValueMeta: {},
     parsedAt: nowIso(),
+    tokenSize: normalizeTokenSize(byKey.size),
     italicizedSkillDc: normalizeNumber(byKey["italicized skill dc"], 0),
     strengthModifier: normalizeNumber(byKey.strength, 0),
     resistDamageBonus: normalizeNumber(byKey["resist damage"], 0),
@@ -1609,6 +1698,12 @@ function createCampaign({
   logs = [],
   terrainTextureDefaults = {},
 }) {
+  const normalizedStatblocks = Array.isArray(statblocks) ? statblocks : [];
+  normalizedStatblocks.forEach((statblock) => {
+    if (statblock && statblock.parsedSheet) {
+      normalizeParsedSheetTokenSize(statblock.parsedSheet);
+    }
+  });
   const baseMapList = Array.isArray(maps) && maps.length > 0
     ? maps.map((map) => normalizeMapShape(map)).filter(Boolean)
     : [createMap({ name: "Default Tabletop Map", rows: DEFAULT_GRID_ROWS, cols: DEFAULT_GRID_COLS })];
@@ -1634,7 +1729,7 @@ function createCampaign({
     };
   }
 
-  return {
+  const campaign = {
     id: createId("campaign"),
     name: String(name || "New Campaign").slice(0, 120),
     dmUserId: dmUserId || null,
@@ -1642,12 +1737,42 @@ function createCampaign({
     createdAt: nowIso(),
     updatedAt: nowIso(),
     characters: Array.isArray(characters) ? characters : [],
-    statblocks: Array.isArray(statblocks) ? statblocks : [],
+    statblocks: normalizedStatblocks,
     maps: baseMapList,
     scene: normalizedScene,
     logs: Array.isArray(logs) ? logs : [],
     terrainTextureDefaults: normalizeTextureDefaults(terrainTextureDefaults, activeTextureCatalog),
   };
+  applyStatblockTokenSizeDefaults(campaign);
+  return campaign;
+}
+
+function applyStatblockTokenSizeDefaults(campaign) {
+  if (!campaign || !Array.isArray(campaign.statblocks) || !Array.isArray(campaign.maps)) {
+    return;
+  }
+  const statblockSizeById = new Map();
+  campaign.statblocks.forEach((statblock) => {
+    if (statblock && statblock.id) {
+      statblockSizeById.set(String(statblock.id), normalizeTokenSize(statblock.parsedSheet && statblock.parsedSheet.tokenSize));
+    }
+  });
+  campaign.maps.forEach((map) => {
+    if (!map || !Array.isArray(map.tokens)) {
+      return;
+    }
+    map.tokens.forEach((token) => {
+      if (
+        token &&
+        token.sourceType === "statblock" &&
+        !token.tokenSizeManual &&
+        statblockSizeById.has(String(token.sourceId || ""))
+      ) {
+        token.tokenSize = statblockSizeById.get(String(token.sourceId || ""));
+        clampTokenAnchorToMap(token, map);
+      }
+    });
+  });
 }
 
 function normalizeCampaignShape(campaign) {
@@ -1662,6 +1787,11 @@ function normalizeCampaignShape(campaign) {
   campaign.updatedAt = campaign.updatedAt || nowIso();
   campaign.characters = Array.isArray(campaign.characters) ? campaign.characters : [];
   campaign.statblocks = Array.isArray(campaign.statblocks) ? campaign.statblocks : [];
+  campaign.statblocks.forEach((statblock) => {
+    if (statblock && statblock.parsedSheet) {
+      normalizeParsedSheetTokenSize(statblock.parsedSheet);
+    }
+  });
   normalizeCampaignTerrainDefaults(campaign, activeTextureCatalog);
   campaign.maps = (Array.isArray(campaign.maps) ? campaign.maps : [])
     .map((map) => normalizeMapShape(map))
@@ -1669,6 +1799,7 @@ function normalizeCampaignShape(campaign) {
   if (campaign.maps.length === 0) {
     campaign.maps.push(createMap({ name: "Default Tabletop Map", rows: DEFAULT_GRID_ROWS, cols: DEFAULT_GRID_COLS }));
   }
+  applyStatblockTokenSizeDefaults(campaign);
   campaign.scene = campaign.scene && typeof campaign.scene === "object"
     ? {
       ...createDefaultScene(campaign.maps[0].id),
@@ -2842,8 +2973,58 @@ function createTabletopSystem(io, options = {}) {
     }
   }
 
+  async function refreshLegacyStatblockTokenSizes() {
+    let changed = false;
+    for (const campaign of state.campaigns) {
+      for (const statblock of campaign.statblocks) {
+        if (!statblock || !statblock.parsedSheet) {
+          continue;
+        }
+        normalizeParsedSheetTokenSize(statblock.parsedSheet);
+        if (
+          statblock.mode !== "column" ||
+          !statblock.sheetUrl ||
+          !statblock.columnName ||
+          parsedSheetSizeValue(statblock.parsedSheet)
+        ) {
+          continue;
+        }
+        try {
+          const parsedColumn = await parseStatblockFromSheet(
+            statblock.sheetUrl,
+            statblock.sheetName || "Augmented beasts",
+            statblock.columnName
+          );
+          if (parsedColumn && parsedColumn.stats) {
+            const parsedSize = normalizeTokenSize(parsedColumn.stats.tokenSize);
+            statblock.parsedSheet.tokenSize = parsedSize;
+            statblock.parsedSheet.currentValues = {
+              ...(statblock.parsedSheet.currentValues && typeof statblock.parsedSheet.currentValues === "object"
+                ? statblock.parsedSheet.currentValues
+                : {}),
+              size:
+                parsedColumn.stats.currentValues && parsedColumn.stats.currentValues.size
+                  ? parsedColumn.stats.currentValues.size
+                  : parsedSize,
+            };
+            statblock.updatedAt = nowIso();
+            changed = true;
+          }
+        } catch (error) {
+          statblock.sheetError = statblock.sheetError || error.message;
+        }
+      }
+      applyStatblockTokenSizeDefaults(campaign);
+    }
+    if (changed) {
+      persistence.saveSoon();
+      broadcastSnapshots();
+    }
+  }
+
   scheduleInitialFovCacheRebuilds();
   refreshHerbs();
+  refreshLegacyStatblockTokenSizes();
 
   namespace.on("connection", (socket) => {
     socket.data.role = "guest";
@@ -3257,12 +3438,14 @@ function createTabletopSystem(io, options = {}) {
         } else {
           target.parsedSheet = parseManualStatblockText(target.manualText);
         }
+        normalizeParsedSheetTokenSize(target.parsedSheet);
         target.sheetError = null;
       } catch (error) {
         target.sheetError = error.message;
         if (!target.parsedSheet) {
           target.parsedSheet = parseManualStatblockText(target.manualText);
         }
+        normalizeParsedSheetTokenSize(target.parsedSheet);
       }
 
       target.availableModifiers = computeAvailableModifiers(target);
@@ -3270,6 +3453,7 @@ function createTabletopSystem(io, options = {}) {
       if (!existing) {
         campaign.statblocks.push(target);
       }
+      applyStatblockTokenSizeDefaults(campaign);
 
       appendSystemLog(campaign, socket, `DM saved statblock ${target.name}.`);
       persistence.saveSoon();
@@ -3884,6 +4068,8 @@ function createTabletopSystem(io, options = {}) {
         sourceId: String((payload && payload.sourceId) || ""),
         ownerUserId: null,
         tokenImage: String((payload && payload.tokenImage) || ""),
+        tokenSize: normalizeTokenSize(payload && payload.tokenSize),
+        tokenSizeManual: false,
         layer: payload && payload.layer === "gm" ? "gm" : "tokens",
         x,
         y,
@@ -3911,11 +4097,15 @@ function createTabletopSystem(io, options = {}) {
         if (statblock) {
           token.name = statblock.name;
           token.tokenImage = statblock.tokenImage || token.tokenImage;
+          token.tokenSize = normalizeTokenSize(
+            statblock.parsedSheet && statblock.parsedSheet.tokenSize
+          );
           token.movementMax = Number(statblock.parsedSheet && statblock.parsedSheet.speed) || token.movementMax;
           token.initiativeMod =
             Number(statblock.parsedSheet && statblock.parsedSheet.initiativeBonus) || token.initiativeMod;
         }
       }
+      clampTokenAnchorToMap(token, map);
 
       map.tokens.push(token);
       map.updatedAt = nowIso();
@@ -3942,6 +4132,11 @@ function createTabletopSystem(io, options = {}) {
       }
       if (payload.tokenImage !== undefined) {
         token.tokenImage = String(payload.tokenImage || "");
+      }
+      if (payload.tokenSize !== undefined) {
+        token.tokenSize = normalizeTokenSize(payload.tokenSize);
+        token.tokenSizeManual = true;
+        clampTokenAnchorToMap(token, map);
       }
       if (payload.autoMove !== undefined) {
         token.autoMove = Boolean(payload.autoMove);
@@ -4034,13 +4229,13 @@ function createTabletopSystem(io, options = {}) {
       if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) {
         return;
       }
-      if (targetX < 0 || targetX >= map.cols || targetY < 0 || targetY >= map.rows) {
+      if (!tokenFootprintFits(map, token, targetX, targetY)) {
         return;
       }
 
       const targetCell = getTerrainCell(map, targetX, targetY);
       const role = roleForUserInCampaign(socket.data.user, campaign);
-      if (isMovementBlockedAt(map, targetX, targetY)) {
+      if (tokenFootprintHasMovementBlocker(map, token, targetX, targetY)) {
         socket.emit("tabletop:error", { message: "That tile blocks movement." });
         return;
       }
@@ -4627,7 +4822,10 @@ function createTabletopSystem(io, options = {}) {
         directions.forEach((direction) => {
           const nx = token.x + direction.dx;
           const ny = token.y + direction.dy;
-          if (isMovementBlockedAt(map, nx, ny)) {
+          if (!tokenFootprintFits(map, token, nx, ny)) {
+            return;
+          }
+          if (tokenFootprintHasMovementBlocker(map, token, nx, ny)) {
             return;
           }
           candidates.push({ x: nx, y: ny });
