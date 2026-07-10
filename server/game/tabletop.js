@@ -33,6 +33,8 @@ const {
 const TABLETOP_NAMESPACE = "/tabletop";
 const DEFAULT_GRID_ROWS = 20;
 const DEFAULT_GRID_COLS = 30;
+const NON_ITEM_RULES_SHEET_ID = "1yFldXsbHSVkHgLh_E7lBuO8bL44gJix9i20mQx1tTdw";
+const INJURY_SHEET_NAME = "Injuries";
 const HERB_SHEET_ID = "1_ly4-3ykWpQ47oDLyF2hDewntCJ4QR6hImODhmwNlYg";
 const HERB_SHEET_NAME = "RULES_HERBS";
 const DEFAULT_GM_TOKEN_OPACITY = 0.55;
@@ -202,74 +204,7 @@ const PRAYER_ROLL_TYPES = new Set([
 
 const ITALICIZED_SKILLS = new Set(["dodge", "stealth", "evoke runes"]);
 
-const INJURY_TABLES = {
-  minor: [
-    "Blood Loss",
-    "Bruising",
-    "Open Wound",
-    "Blurred Vision",
-    "Ringing Ears",
-    "Limp",
-    "Pulled Bicep",
-    "Pulled Thigh",
-    "Nausea",
-    "Minor Mental Trauma",
-    "Mild Concussion 1",
-    "Mild Concussion 2",
-    "Mild Concussion 3",
-    "Mild Concussion 4",
-    "Mild Concussion 5",
-    "Winded",
-    "Cracked Tooth",
-    "Charlie Horse",
-    "Sprain",
-    "Minor Scar",
-  ],
-  moderate: [
-    "Severe Blood Loss",
-    "Horrible Scar",
-    "Festering Wound",
-    "Broken Rib",
-    "Punctured Lung",
-    "Ruptured Liver",
-    "Ruptured Intestines",
-    "Busted Kidney",
-    "Broken Arm or Hand",
-    "Broken Foot or Leg",
-    "Break a Finger",
-    "Magical Backlash",
-    "Mental Trauma",
-    "Concussion 1",
-    "Concussion 2",
-    "Concussion 3",
-    "Concussion 4",
-    "Concussion 5",
-    "Deep Laceration",
-    "Bone Fracture",
-  ],
-  major: [
-    "Coma",
-    "Internal Damage 1",
-    "Internal Damage 2",
-    "Internal Damage 3",
-    "Internal Damage 4",
-    "Brain Damage 1",
-    "Brain Damage 2",
-    "Broken Spine",
-    "Lose an Eye",
-    "Lose an Arm or Hand",
-    "Lose a Foot or Leg",
-    "Lose a Finger (thumb)",
-    "Lose an Ear",
-    "Teeth Knocked Out",
-    "Lose a Nose",
-    "Major Magical Backlash",
-    "Severe Mental Trauma",
-    "Severe Concussion 1",
-    "Severe Concussion 2",
-    "Lose a Finger (not thumb)",
-  ],
-};
+const INJURY_TIERS = ["minor", "moderate", "major"];
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -377,6 +312,31 @@ function tokenSizeSquares(value) {
   return TOKEN_SIZE_SQUARES[normalizeTokenSize(value)] || 1;
 }
 
+function firstFiniteNumber(value) {
+  if (Number.isFinite(Number(value))) {
+    return Number(value);
+  }
+  const match = String(value === null || value === undefined ? "" : value).match(/-?\d+(?:\.\d+)?/);
+  if (!match) {
+    return null;
+  }
+  const parsed = Number.parseFloat(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeTokenHpShape(hp, fallbackMax = 1) {
+  const source = hp && typeof hp === "object" ? hp : {};
+  const fallback = Math.max(1, Math.round(firstFiniteNumber(fallbackMax) || 1));
+  const max = Math.max(1, Math.round(firstFiniteNumber(source.max) || fallback));
+  const currentRaw = firstFiniteNumber(source.current);
+  const current = clamp(
+    Math.round(Number.isFinite(currentRaw) ? currentRaw : max),
+    0,
+    max
+  );
+  return { current, max };
+}
+
 function clampTokenAnchorToMap(token, map) {
   if (!token || !map) {
     return;
@@ -405,6 +365,7 @@ function normalizeMapTokenShape(token, map) {
     y: Number.parseInt(token.y, 10) || 0,
     movementMax: Math.max(0, Number.parseInt(token.movementMax, 10) || 30),
     initiativeMod: Number.parseInt(token.initiativeMod, 10) || 0,
+    hp: token.hp && typeof token.hp === "object" ? normalizeTokenHpShape(token.hp, token.hp.max) : null,
     autoMove: Boolean(token.autoMove),
     autoMoveType: String(token.autoMoveType || "wander"),
     movementInfo:
@@ -517,35 +478,114 @@ function rollDice(count, sides) {
   };
 }
 
-function parseRollCommand(text) {
+function parseRollExpression(expression) {
+  const compact = String(expression || "").replace(/\s+/g, "");
+  if (!compact) {
+    return null;
+  }
+
+  const terms = [];
+  let index = 0;
+  let sign = 1;
+
+  while (index < compact.length) {
+    const char = compact[index];
+    if (char === "+") {
+      sign = 1;
+      index += 1;
+    } else if (char === "-") {
+      sign = -1;
+      index += 1;
+    } else if (index === 0) {
+      sign = 1;
+    } else {
+      return null;
+    }
+
+    const rest = compact.slice(index);
+    const diceMatch = rest.match(/^(\d*)d(\d+)(k1|kl1)?/i);
+    if (diceMatch) {
+      const diceCount = diceMatch[1] ? Number.parseInt(diceMatch[1], 10) : 1;
+      const sides = Number.parseInt(diceMatch[2], 10);
+      const mode = diceMatch[3] ? diceMatch[3].toLowerCase() : "sum";
+      const roll = rollDice(diceCount, sides);
+      let chosen = roll.sum;
+      if (mode === "k1") {
+        chosen = roll.max;
+      } else if (mode === "kl1") {
+        chosen = roll.min;
+      }
+      const notation = `${roll.count}d${roll.sides}${mode === "sum" ? "" : mode}`;
+      terms.push({
+        type: "dice",
+        sign,
+        notation,
+        diceCount: roll.count,
+        sides: roll.sides,
+        mode,
+        dice: roll.dice,
+        chosen,
+        value: sign * chosen,
+      });
+      index += diceMatch[0].length;
+    } else {
+      const scalarMatch = rest.match(/^\d+/);
+      if (!scalarMatch) {
+        return null;
+      }
+      const scalar = Number.parseInt(scalarMatch[0], 10);
+      terms.push({
+        type: "scalar",
+        sign,
+        notation: String(scalar),
+        value: sign * scalar,
+      });
+      index += scalarMatch[0].length;
+    }
+
+    if (terms.length > 50) {
+      return null;
+    }
+  }
+
+  if (terms.length === 0 || !terms.some((term) => term.type === "dice")) {
+    return null;
+  }
+
+  return {
+    terms,
+    total: terms.reduce((acc, term) => acc + Number(term.value || 0), 0),
+  };
+}
+
+function parseRollCommand(text, commandName = "r") {
   const trimmed = String(text || "").trim();
-  const match = trimmed.match(/^\/r\s*(?:(\d*)d(\d+)(k1|kl1)?)\s*(?:([+-])\s*(\d+))?\s*$/i);
+  const commandPattern = commandName === "gmroll" ? /^\/gmroll\s+(.+)$/i : /^\/r\s+(.+)$/i;
+  const match = trimmed.match(commandPattern);
   if (!match) {
     return null;
   }
-  const diceCount = match[1] ? Number.parseInt(match[1], 10) : 1;
-  const sides = Number.parseInt(match[2], 10);
-  const mode = match[3] ? match[3].toLowerCase() : "sum";
-  const sign = match[4] || "+";
-  const scalar = match[5] ? Number.parseInt(match[5], 10) : 0;
-  const roll = rollDice(diceCount, sides);
-  let chosen = roll.sum;
-  if (mode === "k1") {
-    chosen = roll.max;
-  } else if (mode === "kl1") {
-    chosen = roll.min;
+  const parsed = parseRollExpression(match[1]);
+  if (!parsed) {
+    return null;
   }
-  const offset = sign === "-" ? -scalar : scalar;
+  const firstDiceTerm = parsed.terms.find((term) => term.type === "dice") || {};
   return {
     ok: true,
+    kind: "dice-command",
+    command: commandName,
     notation: trimmed,
-    diceCount: roll.count,
-    sides: roll.sides,
-    mode,
-    dice: roll.dice,
-    chosen,
-    offset,
-    total: chosen + offset,
+    expression: match[1].replace(/\s+/g, ""),
+    terms: parsed.terms,
+    diceCount: firstDiceTerm.diceCount || 0,
+    sides: firstDiceTerm.sides || 0,
+    mode: firstDiceTerm.mode || "sum",
+    dice: firstDiceTerm.dice || [],
+    chosen: Number(firstDiceTerm.chosen) || 0,
+    offset: parsed.terms
+      .filter((term) => term !== firstDiceTerm)
+      .reduce((acc, term) => acc + Number(term.value || 0), 0),
+    total: parsed.total,
   };
 }
 
@@ -1007,6 +1047,42 @@ function normalizeParsedSheetTokenSize(parsedSheet, fallback = "medium") {
   return parsedSheet;
 }
 
+function createParsedCurrentValueMeta(key, value) {
+  const parsedValue = parseSheetCellValue(value);
+  return {
+    key,
+    rowNumber: null,
+    baseRaw: String(value === null || value === undefined ? "" : value),
+    currentRaw: "",
+    baseValue: parsedValue,
+    currentValue: "",
+    displayValue: String(parsedValue),
+    hasCurrent: false,
+    hasBase: String(value === null || value === undefined ? "" : value).trim() !== "",
+    bCell: null,
+    dCell: null,
+  };
+}
+
+function statblockDisplayName(rows, index, byName, columnName) {
+  const candidates = [
+    byName.name,
+    columnName,
+    rows && rows[0] ? rows[0][index] : "",
+  ];
+  for (const candidate of candidates) {
+    const parts = String(candidate || "")
+      .split(/\r?\n/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const first = parts.find((part) => !/^name$/i.test(part) && !/^creature type$/i.test(part));
+    if (first) {
+      return first.replace(/^Name\s*/i, "").trim();
+    }
+  }
+  return "";
+}
+
 function parseStatblockColumn(rows, columnName) {
   const header = rows[0] || [];
   let index = -1;
@@ -1057,9 +1133,43 @@ function parseStatblockColumn(rows, columnName) {
     }
   });
 
-  const displayName = String(rows[0][index] || columnName).replace(/^Name Creature Type\s*/i, "").trim();
+  const displayName = statblockDisplayName(rows, index, byName, columnName);
   const rawSize = byName.size !== undefined ? String(byName.size || "").trim() : "";
   const tokenSize = normalizeTokenSize(rawSize);
+  const hp = Math.max(1, normalizeNumber(byName.hp, 1));
+  const ac = byName.ac !== undefined ? normalizeNumber(byName.ac, 0) : null;
+  const currentValues = {
+    size: rawSize || tokenSize,
+    speed: normalizeNumber(byName.speed, 30),
+    hp,
+    "current hp": hp,
+    "max hp": hp,
+  };
+  const currentValueMeta = rawSize
+    ? {
+      size: {
+        key: "size",
+        rowNumber: null,
+        baseRaw: rawSize,
+        currentRaw: "",
+        baseValue: rawSize,
+        currentValue: "",
+        displayValue: rawSize,
+        hasCurrent: false,
+        hasBase: true,
+        bCell: null,
+        dCell: null,
+      },
+    }
+    : {};
+  currentValueMeta.speed = createParsedCurrentValueMeta("speed", currentValues.speed);
+  currentValueMeta.hp = createParsedCurrentValueMeta("hp", hp);
+  currentValueMeta["current hp"] = currentValueMeta.hp;
+  currentValueMeta["max hp"] = createParsedCurrentValueMeta("max hp", hp);
+  if (ac !== null) {
+    currentValues.ac = ac;
+    currentValueMeta.ac = createParsedCurrentValueMeta("ac", ac);
+  }
   return {
     name: displayName || columnName,
     stats: {
@@ -1069,31 +1179,11 @@ function parseStatblockColumn(rows, columnName) {
       resistDamageBonus: normalizeNumber(byName["resist damage"], 0),
       initiativeBonus: normalizeNumber(byName.initiative, 0),
       speed: normalizeNumber(byName.speed, 30),
-      maxHp: Math.max(1, normalizeNumber(byName.hp, 1)),
+      maxHp: hp,
       italicizedSkillDc: 0,
       feats: [],
-      currentValues: {
-        size: rawSize || tokenSize,
-        speed: normalizeNumber(byName.speed, 30),
-        "max hp": Math.max(1, normalizeNumber(byName.hp, 1)),
-      },
-      currentValueMeta: rawSize
-        ? {
-          size: {
-            key: "size",
-            rowNumber: null,
-            baseRaw: rawSize,
-            currentRaw: "",
-            baseValue: rawSize,
-            currentValue: "",
-            displayValue: rawSize,
-            hasCurrent: false,
-            hasBase: true,
-            bCell: null,
-            dCell: null,
-          },
-        }
-        : {},
+      currentValues,
+      currentValueMeta,
       parsedAt: nowIso(),
     },
   };
@@ -1143,6 +1233,51 @@ async function loadHerbDatabase() {
     });
   }
   return herbs;
+}
+
+function normalizeInjuryTierValue(value) {
+  const normalized = normalizeSkillName(value);
+  return INJURY_TIERS.includes(normalized) ? normalized : "";
+}
+
+async function loadInjuryTables() {
+  const csv = await fetchCsvFromSheet(NON_ITEM_RULES_SHEET_ID, INJURY_SHEET_NAME);
+  const rows = parseCsv(csv);
+  const byTier = Object.fromEntries(INJURY_TIERS.map((tier) => [tier, []]));
+
+  for (let i = 1; i < rows.length; i += 1) {
+    const row = rows[i];
+    if (!row) {
+      continue;
+    }
+    const tier = normalizeInjuryTierValue(row[0]);
+    const name = normalizeSheetCellText(row[2]);
+    if (!tier || !name) {
+      continue;
+    }
+    const roll = Number.parseInt(row[1], 10);
+    byTier[tier].push({
+      tier,
+      roll: Number.isFinite(roll) ? roll : null,
+      name,
+      effect: normalizeSheetCellText(row[3]),
+    });
+  }
+
+  return byTier;
+}
+
+function chooseInjuryFromTable(table) {
+  if (!Array.isArray(table) || table.length === 0) {
+    return null;
+  }
+  const tableRoll = randomInt(1, table.length);
+  const byRoll = table.find((entry) => entry.roll === tableRoll);
+  const entry = byRoll || table[tableRoll - 1] || table[randomInt(0, table.length - 1)];
+  return {
+    tableRoll,
+    ...entry,
+  };
 }
 
 function resizeMapInPlace(map, rows, cols, textureCatalog = activeTextureCatalog) {
@@ -1747,6 +1882,31 @@ function createCampaign({
   return campaign;
 }
 
+function resolveTokenHpForEntity(entity, fallbackHp = null) {
+  const parsed = entity && entity.parsedSheet && typeof entity.parsedSheet === "object"
+    ? entity.parsedSheet
+    : null;
+  const fallbackMax = fallbackHp && typeof fallbackHp === "object" ? fallbackHp.max : 1;
+  if (!parsed) {
+    return normalizeTokenHpShape(fallbackHp, fallbackMax);
+  }
+  const maxCandidates = [
+    parsed.maxHp,
+    getNumericParsedCurrentValue(parsed, "max hp"),
+    getNumericParsedCurrentValue(parsed, "hp"),
+    fallbackMax,
+  ];
+  const max = Math.max(1, Math.round(maxCandidates.find((value) => Number.isFinite(Number(value))) || 1));
+  const currentCandidates = [
+    getNumericParsedCurrentValue(parsed, "current hp"),
+    getNumericParsedCurrentValue(parsed, "hp"),
+    fallbackHp && typeof fallbackHp === "object" ? fallbackHp.current : null,
+    max,
+  ];
+  const current = currentCandidates.find((value) => Number.isFinite(Number(value)));
+  return normalizeTokenHpShape({ current, max }, max);
+}
+
 function applyStatblockTokenSizeDefaults(campaign) {
   if (!campaign || !Array.isArray(campaign.statblocks) || !Array.isArray(campaign.maps)) {
     return;
@@ -1757,6 +1917,12 @@ function applyStatblockTokenSizeDefaults(campaign) {
       statblockSizeById.set(String(statblock.id), normalizeTokenSize(statblock.parsedSheet && statblock.parsedSheet.tokenSize));
     }
   });
+  const characterById = new Map((Array.isArray(campaign.characters) ? campaign.characters : [])
+    .filter((character) => character && character.id)
+    .map((character) => [String(character.id), character]));
+  const statblockById = new Map((Array.isArray(campaign.statblocks) ? campaign.statblocks : [])
+    .filter((statblock) => statblock && statblock.id)
+    .map((statblock) => [String(statblock.id), statblock]));
   campaign.maps.forEach((map) => {
     if (!map || !Array.isArray(map.tokens)) {
       return;
@@ -1770,6 +1936,17 @@ function applyStatblockTokenSizeDefaults(campaign) {
       ) {
         token.tokenSize = statblockSizeById.get(String(token.sourceId || ""));
         clampTokenAnchorToMap(token, map);
+      }
+      if (!token.hp) {
+        let entity = null;
+        if (token.sourceType === "character") {
+          entity = characterById.get(String(token.sourceId || "")) || null;
+        } else if (token.sourceType === "statblock") {
+          entity = statblockById.get(String(token.sourceId || "")) || null;
+        }
+        token.hp = resolveTokenHpForEntity(entity, token.hp);
+      } else {
+        token.hp = normalizeTokenHpShape(token.hp, token.hp.max);
       }
     });
   });
@@ -1930,8 +2107,8 @@ function createPersistence(dataDirectory) {
   };
 }
 
-function createLogEntry({ type, actor, actorUserId, message, details }) {
-  return {
+function createLogEntry({ type, actor, actorUserId, message, details, visibility = null }) {
+  const entry = {
     id: createId("log"),
     timestamp: nowIso(),
     type,
@@ -1940,6 +2117,10 @@ function createLogEntry({ type, actor, actorUserId, message, details }) {
     message: String(message || ""),
     details: details || null,
   };
+  if (visibility === "dm" || visibility === "public") {
+    entry.visibility = visibility;
+  }
+  return entry;
 }
 
 function activeMapFromCampaign(campaign) {
@@ -2019,6 +2200,12 @@ function logVisibleToRole(campaign, entry, role, users = []) {
   if (role === "dm") {
     return true;
   }
+  if (entry.visibility === "dm") {
+    return false;
+  }
+  if (entry.visibility === "public") {
+    return true;
+  }
   const dmUserId = String((campaign && campaign.dmUserId) || "");
   if (dmUserId && entry.actorUserId && String(entry.actorUserId) === dmUserId) {
     return false;
@@ -2028,6 +2215,36 @@ function logVisibleToRole(campaign, entry, role, users = []) {
     return false;
   }
   return true;
+}
+
+function sanitizeInitiativeForClient(initiative, map, role) {
+  const base = initiative && typeof initiative === "object" ? initiative : createDefaultInitiativeState();
+  const sourceOrder = Array.isArray(base.order) ? base.order : [];
+  const currentSourceIndex = clamp(
+    Number(base.currentIndex) || 0,
+    0,
+    Math.max(0, sourceOrder.length - 1)
+  );
+  const currentTokenId = sourceOrder[currentSourceIndex] ? sourceOrder[currentSourceIndex].tokenId : null;
+  const order = sourceOrder
+    .map((entry) => {
+      const token = map ? findTokenById(map, entry && entry.tokenId) : null;
+      return {
+        ...entry,
+        layer: entry && entry.layer ? entry.layer : token && token.layer ? token.layer : "tokens",
+        deleted: !token,
+      };
+    })
+    .filter((entry) => role === "dm" || entry.layer !== "gm");
+  const currentIndex = currentTokenId
+    ? Math.max(0, order.findIndex((entry) => entry.tokenId === currentTokenId))
+    : 0;
+  return {
+    ...createDefaultInitiativeState(),
+    ...base,
+    order,
+    currentIndex: order.length > 0 ? currentIndex : 0,
+  };
 }
 
 function createTabletopSystem(io, options = {}) {
@@ -2046,6 +2263,11 @@ function createTabletopSystem(io, options = {}) {
   const herbsState = {
     loadedAt: null,
     herbs: [],
+    error: null,
+  };
+  const injuriesState = {
+    loadedAt: null,
+    byTier: Object.fromEntries(INJURY_TIERS.map((tier) => [tier, []])),
     error: null,
   };
 
@@ -2242,7 +2464,11 @@ function createTabletopSystem(io, options = {}) {
         activeMapId: map ? map.id : null,
         map: sanitizedMapForRole(map, role),
         selectedDmCharacterId,
-        initiative: campaign && campaign.scene ? campaign.scene.initiative : createDefaultInitiativeState(),
+        initiative: sanitizeInitiativeForClient(
+          campaign && campaign.scene ? campaign.scene.initiative : createDefaultInitiativeState(),
+          map,
+          role
+        ),
       },
       maps: (campaign && Array.isArray(campaign.maps) ? campaign.maps : []).map((candidate) => ({
         id: candidate.id,
@@ -2272,6 +2498,14 @@ function createTabletopSystem(io, options = {}) {
         loadedAt: herbsState.loadedAt,
         count: herbsState.herbs.length,
         error: herbsState.error,
+      },
+      injuries: {
+        loadedAt: injuriesState.loadedAt,
+        count: INJURY_TIERS.reduce(
+          (total, tier) => total + (Array.isArray(injuriesState.byTier[tier]) ? injuriesState.byTier[tier].length : 0),
+          0
+        ),
+        error: injuriesState.error,
       },
       connectedUsers: getConnectedUsers(campaign ? campaign.id : null),
     };
@@ -2973,6 +3207,18 @@ function createTabletopSystem(io, options = {}) {
     }
   }
 
+  async function refreshInjuries() {
+    try {
+      const byTier = await loadInjuryTables();
+      injuriesState.byTier = byTier;
+      injuriesState.loadedAt = nowIso();
+      injuriesState.error = null;
+      broadcastSnapshots();
+    } catch (error) {
+      injuriesState.error = error.message;
+    }
+  }
+
   async function refreshLegacyStatblockTokenSizes() {
     let changed = false;
     for (const campaign of state.campaigns) {
@@ -3024,6 +3270,7 @@ function createTabletopSystem(io, options = {}) {
 
   scheduleInitialFovCacheRebuilds();
   refreshHerbs();
+  refreshInjuries();
   refreshLegacyStatblockTokenSizes();
 
   namespace.on("connection", (socket) => {
@@ -3762,7 +4009,7 @@ function createTabletopSystem(io, options = {}) {
         return;
       }
       const type = String((payload && payload.type) || "").trim().toLowerCase();
-      const allowedTypes = new Set(["distance", "cone", "circle", "rectangle", "polyline"]);
+      const allowedTypes = new Set(["distance", "cone", "circle", "rectangle", "polyline", "target"]);
       if (!allowedTypes.has(type)) {
         socket.emit("tabletop:error", { message: "Unknown drawing type." });
         return;
@@ -4075,6 +4322,7 @@ function createTabletopSystem(io, options = {}) {
         y,
         movementMax: Number.parseInt(payload && payload.movementMax, 10) || 30,
         initiativeMod: Number.parseInt(payload && payload.initiativeMod, 10) || 0,
+        hp: null,
         autoMove: Boolean(payload && payload.autoMove),
         autoMoveType: String((payload && payload.autoMoveType) || "wander"),
         vision: normalizeTokenVisionConfig(payload && payload.vision),
@@ -4089,6 +4337,7 @@ function createTabletopSystem(io, options = {}) {
           token.movementMax = Number(character.parsedSheet && character.parsedSheet.speed) || token.movementMax;
           token.initiativeMod =
             Number(character.parsedSheet && character.parsedSheet.initiativeBonus) || token.initiativeMod;
+          token.hp = resolveTokenHpForEntity(character);
         }
       }
 
@@ -4103,7 +4352,11 @@ function createTabletopSystem(io, options = {}) {
           token.movementMax = Number(statblock.parsedSheet && statblock.parsedSheet.speed) || token.movementMax;
           token.initiativeMod =
             Number(statblock.parsedSheet && statblock.parsedSheet.initiativeBonus) || token.initiativeMod;
+          token.hp = resolveTokenHpForEntity(statblock);
         }
+      }
+      if (!token.hp) {
+        token.hp = normalizeTokenHpShape(null, 1);
       }
       clampTokenAnchorToMap(token, map);
 
@@ -4157,6 +4410,36 @@ function createTabletopSystem(io, options = {}) {
         });
       }
       map.updatedAt = nowIso();
+      persistence.saveSoon();
+      broadcastSnapshots();
+    });
+
+    socket.on("token:updateHp", (payload) => {
+      if (!requireAuth(socket)) {
+        return;
+      }
+      const campaign = ensureSocketCampaign(socket);
+      const map = activeMapFromCampaign(campaign);
+      if (!map) {
+        return;
+      }
+      const token = findTokenById(map, payload && payload.tokenId);
+      if (!token) {
+        return;
+      }
+      if (!canControlToken(socket, campaign, token)) {
+        socket.emit("tabletop:error", { message: "You cannot edit this token's HP." });
+        return;
+      }
+      token.hp = normalizeTokenHpShape(
+        {
+          current: payload && payload.current,
+          max: payload && payload.max,
+        },
+        token.hp && token.hp.max ? token.hp.max : 1
+      );
+      map.updatedAt = nowIso();
+      campaign.updatedAt = nowIso();
       persistence.saveSoon();
       broadcastSnapshots();
     });
@@ -4284,13 +4567,13 @@ function createTabletopSystem(io, options = {}) {
         return;
       }
       const entries = map.tokens
-        .filter((token) => token.layer === "tokens")
         .map((token) => {
           const roll = randomInt(1, 20);
           const total = roll + (Number(token.initiativeMod) || 0);
           return {
             tokenId: token.id,
             name: token.name,
+            layer: token.layer === "gm" ? "gm" : "tokens",
             roll,
             initiativeMod: Number(token.initiativeMod) || 0,
             total,
@@ -4381,14 +4664,25 @@ function createTabletopSystem(io, options = {}) {
         return;
       }
 
-      initiative.currentIndex += 1;
-      if (initiative.currentIndex >= initiative.order.length) {
+      let foundNext = false;
+      for (let attempts = 0; attempts < initiative.order.length; attempts += 1) {
+        initiative.currentIndex += 1;
+        if (initiative.currentIndex >= initiative.order.length) {
+          initiative.currentIndex = 0;
+          initiative.round += 1;
+        }
+        const candidate = initiative.order[initiative.currentIndex];
+        if (candidate && findTokenById(map, candidate.tokenId)) {
+          foundNext = true;
+          break;
+        }
+      }
+      if (!foundNext) {
         initiative.currentIndex = 0;
-        initiative.round += 1;
       }
 
       const current = initiative.order[initiative.currentIndex];
-      if (current) {
+      if (current && foundNext) {
         initiative.movementSpentByToken[current.tokenId] = 0;
         const token = findTokenById(map, current.tokenId);
         if (token) {
@@ -4593,12 +4887,27 @@ function createTabletopSystem(io, options = {}) {
       broadcastSnapshots();
     });
 
-    socket.on("injury:roll", (payload) => {
+    socket.on("injury:roll", async (payload) => {
       if (!requireAuth(socket)) {
         return;
       }
       const campaign = ensureSocketCampaign(socket);
       const overkill = Math.max(0, Number.parseInt(payload && payload.overkill, 10) || 0);
+
+      if (!injuriesState.loadedAt) {
+        await refreshInjuries();
+      }
+      if (
+        !injuriesState.loadedAt ||
+        INJURY_TIERS.some((tier) => !Array.isArray(injuriesState.byTier[tier]) || injuriesState.byTier[tier].length === 0)
+      ) {
+        socket.emit("tabletop:error", {
+          message: injuriesState.error
+            ? `Injury table is not loaded: ${injuriesState.error}`
+            : "Injury table is not loaded yet.",
+        });
+        return;
+      }
 
       let entity = null;
       if (payload && payload.characterId) {
@@ -4646,11 +4955,19 @@ function createTabletopSystem(io, options = {}) {
 
       let injuryTier = null;
       let injuryName = null;
+      let injuryEffect = null;
+      let injuryTableRoll = null;
       if (!injuryPassed) {
         const failureBy = injuryDc - injuryTotal;
         injuryTier = resolveInjuryTier(failureBy);
-        const table = INJURY_TABLES[injuryTier];
-        injuryName = table[randomInt(0, table.length - 1)];
+        const injuryEntry = chooseInjuryFromTable(injuriesState.byTier[injuryTier]);
+        if (!injuryEntry) {
+          socket.emit("tabletop:error", { message: `No ${injuryTier} injuries are loaded.` });
+          return;
+        }
+        injuryName = injuryEntry.name;
+        injuryEffect = injuryEntry.effect || "";
+        injuryTableRoll = injuryEntry.tableRoll || injuryEntry.roll || null;
       }
 
       const outcome = {
@@ -4672,6 +4989,8 @@ function createTabletopSystem(io, options = {}) {
           passed: injuryPassed,
           tier: injuryTier,
           injury: injuryName,
+          effect: injuryEffect,
+          tableRoll: injuryTableRoll,
         },
       };
 
@@ -4751,11 +5070,34 @@ function createTabletopSystem(io, options = {}) {
         return;
       }
 
-      if (text.toLowerCase().startsWith("/r")) {
-        const parsed = parseRollCommand(text);
+      if (text.toLowerCase().startsWith("/gmroll")) {
+        if (roleForUserInCampaign(socket.data.user, campaign) !== "dm") {
+          socket.emit("tabletop:error", { message: "Only the DM can use /gmroll." });
+          return;
+        }
+        const parsed = parseRollCommand(text, "gmroll");
         if (!parsed) {
           socket.emit("tabletop:error", {
-            message: "Bad roll command. Use /r NdX, /r NdXk1, /r NdXkl1, and optional +Y/-Y.",
+            message: "Bad GM roll command. Use /gmroll NdX or dice math such as /gmroll 2d8+1d6.",
+          });
+          return;
+        }
+        appendLog(
+          campaign,
+          createLogEntry({
+            type: "roll",
+            actor: socket.data.user.username,
+            actorUserId: socket.data.user.id,
+            message: `${socket.data.user.username} secretly rolled ${parsed.expression} = ${parsed.total}`,
+            details: parsed,
+            visibility: "dm",
+          })
+        );
+      } else if (text.toLowerCase().startsWith("/r")) {
+        const parsed = parseRollCommand(text, "r");
+        if (!parsed) {
+          socket.emit("tabletop:error", {
+            message: "Bad roll command. Use /r NdX, /r NdXk1, /r NdXkl1, or dice math such as /r 2d8+1d6.",
           });
           return;
         }
@@ -4767,6 +5109,7 @@ function createTabletopSystem(io, options = {}) {
             actorUserId: socket.data.user.id,
             message: `${socket.data.user.username} rolled ${parsed.notation} = ${parsed.total}`,
             details: parsed,
+            visibility: "public",
           })
         );
       } else {
@@ -4861,6 +5204,7 @@ function createTabletopSystem(io, options = {}) {
     getState: () => state,
     forceSave: () => persistence.forceSave(),
     refreshHerbs,
+    refreshInjuries,
   };
 }
 

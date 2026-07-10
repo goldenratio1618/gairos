@@ -10,6 +10,7 @@
   const DEFAULT_DARKVISION_TINT = "#6f89b8";
   const DEFAULT_DARKVISION_TINT_ALPHA = 0.42;
   const DEFAULT_TOKEN_AURA_COLOR = "#59a8ff";
+  const DEFAULT_DRAWING_COLOR = "#ff0000";
   const MAX_LIGHT_RADIUS_FEET = 10_000;
   const TOKEN_SIZE_SQUARES = {
     medium: 1,
@@ -258,6 +259,7 @@
     selectedTokenIds: new Set(),
     selectedPlacement: null,
     selectedCharacterId: null,
+    selectedRollEntityValue: "",
     pendingNewCharacterName: null,
     lastRollSkillKey: null,
     activeMenu: "character",
@@ -291,10 +293,24 @@
       dragStarted: false,
       suppressClickUntil: 0,
     },
+    tokenMoveQueue: {
+      tokenId: null,
+      steps: [],
+      inFlight: null,
+      timer: null,
+    },
+    longPressTarget: {
+      timer: null,
+      x: 0,
+      y: 0,
+      startClientX: 0,
+      startClientY: 0,
+      fired: false,
+    },
     tool: {
       active: "distance",
       distanceMode: "linf",
-      drawingColor: "#f3c56e",
+      drawingColor: DEFAULT_DRAWING_COLOR,
       dragging: false,
       start: null,
       end: null,
@@ -1809,6 +1825,7 @@
     const activeLayer = isDm() ? state.tokenLayer : "tokens";
 
     if (!event || !event.shiftKey) {
+      resetTokenMoveQueue();
       state.selectedTokenIds.clear();
     }
     (map.tokens || []).forEach((token) => {
@@ -1888,7 +1905,7 @@
   }
 
   function setDrawingColor(color) {
-    const normalized = /^#[0-9a-f]{6}$/i.test(String(color || "")) ? color : "#f3c56e";
+    const normalized = /^#[0-9a-f]{6}$/i.test(String(color || "")) ? color : DEFAULT_DRAWING_COLOR;
     state.tool.drawingColor = normalized;
     if (elements.drawingColor) {
       elements.drawingColor.value = normalized;
@@ -2076,6 +2093,72 @@
     return true;
   }
 
+  function cancelTargetLongPress() {
+    if (state.longPressTarget.timer) {
+      clearTimeout(state.longPressTarget.timer);
+    }
+    state.longPressTarget.timer = null;
+    state.longPressTarget.fired = false;
+  }
+
+  function canStartTargetLongPress(event) {
+    return Boolean(
+      event &&
+      event.button === 0 &&
+      isAuthenticated() &&
+      !event.altKey &&
+      !isPaintModeActive() &&
+      !isLightingModeActive() &&
+      !isPlaceModeActive()
+    );
+  }
+
+  function createTargetArtifactAt(x, y) {
+    const cellSize = state.tool.cellSize || 40;
+    emit("map:addDrawing", {
+      type: "target",
+      color: state.tool.drawingColor || DEFAULT_DRAWING_COLOR,
+      layer: "tokens",
+      data: {
+        cx: x * cellSize + cellSize / 2,
+        cy: y * cellSize + cellSize / 2,
+        radius: Math.max(8, cellSize * 0.34),
+      },
+    });
+    state.suppressCellClickUntil = Date.now() + 350;
+    state.dragSelect.active = false;
+    setStatus("Target marked.");
+  }
+
+  function startTargetLongPress(x, y, event) {
+    cancelTargetLongPress();
+    if (!canStartTargetLongPress(event)) {
+      return;
+    }
+    state.longPressTarget.x = x;
+    state.longPressTarget.y = y;
+    state.longPressTarget.startClientX = event.clientX;
+    state.longPressTarget.startClientY = event.clientY;
+    state.longPressTarget.fired = false;
+    state.longPressTarget.timer = setTimeout(() => {
+      state.longPressTarget.timer = null;
+      state.longPressTarget.fired = true;
+      createTargetArtifactAt(state.longPressTarget.x, state.longPressTarget.y);
+    }, 550);
+  }
+
+  function updateTargetLongPress(event) {
+    if (!state.longPressTarget.timer || !event) {
+      return;
+    }
+    const moved =
+      Math.abs(event.clientX - state.longPressTarget.startClientX) +
+      Math.abs(event.clientY - state.longPressTarget.startClientY);
+    if (moved > 10) {
+      cancelTargetLongPress();
+    }
+  }
+
   function createSvgElement(name) {
     return document.createElementNS("http://www.w3.org/2000/svg", name);
   }
@@ -2119,7 +2202,15 @@
     if (!shape || !drawing || !drawing.id) {
       return null;
     }
-    const hitShape = shape.cloneNode(false);
+    let hitShape = null;
+    if (drawing.type === "target" && drawing.data) {
+      hitShape = createSvgElement("circle");
+      hitShape.setAttribute("cx", String(drawing.data.cx || 0));
+      hitShape.setAttribute("cy", String(drawing.data.cy || 0));
+      hitShape.setAttribute("r", String(Math.max(12, Number(drawing.data.radius) || 0) + 10));
+    } else {
+      hitShape = shape.cloneNode(false);
+    }
     hitShape.classList.add("tt-drawing-hitarea");
     hitShape.dataset.drawingId = drawing.id;
     hitShape.style.opacity = "0";
@@ -2166,7 +2257,7 @@
     if (!layer || !drawing || !drawing.data) {
       return;
     }
-    const color = drawing.color || "#f3c56e";
+    const color = drawing.color || DEFAULT_DRAWING_COLOR;
     let shape = null;
 
     if (drawing.type === "distance") {
@@ -2201,6 +2292,31 @@
           drawing.data.x3 || 0
         },${drawing.data.y3 || 0}`
       );
+    } else if (drawing.type === "target") {
+      const cx = Number(drawing.data.cx) || 0;
+      const cy = Number(drawing.data.cy) || 0;
+      const radius = Math.max(8, Number(drawing.data.radius) || 12);
+      shape = createSvgElement("g");
+      const circle = createSvgElement("circle");
+      circle.setAttribute("cx", String(cx));
+      circle.setAttribute("cy", String(cy));
+      circle.setAttribute("r", String(radius));
+      const hLine = createSvgElement("line");
+      hLine.setAttribute("x1", String(cx - radius * 1.45));
+      hLine.setAttribute("y1", String(cy));
+      hLine.setAttribute("x2", String(cx + radius * 1.45));
+      hLine.setAttribute("y2", String(cy));
+      const vLine = createSvgElement("line");
+      vLine.setAttribute("x1", String(cx));
+      vLine.setAttribute("y1", String(cy - radius * 1.45));
+      vLine.setAttribute("x2", String(cx));
+      vLine.setAttribute("y2", String(cy + radius * 1.45));
+      [circle, hLine, vLine].forEach((child) => {
+        child.setAttribute("fill", "none");
+        child.style.stroke = color;
+        child.style.strokeWidth = "2.4";
+        shape.appendChild(child);
+      });
     }
 
     if (!shape) {
@@ -2213,7 +2329,7 @@
     }
     shape.style.stroke = color;
     shape.style.fill =
-      drawing.fill !== undefined ? drawing.fill : drawing.type === "distance" ? "none" : "";
+      drawing.fill !== undefined ? drawing.fill : drawing.type === "distance" || drawing.type === "target" ? "none" : "";
     if (drawing.layer === "gm") {
       shape.style.opacity = "0.62";
     }
@@ -2761,6 +2877,83 @@
     return TOKEN_SIZE_LABELS[size] || TOKEN_SIZE_LABELS.medium;
   }
 
+  function firstFiniteNumber(value) {
+    if (Number.isFinite(Number(value))) {
+      return Number(value);
+    }
+    const match = String(value === null || value === undefined ? "" : value).match(/-?\d+(?:\.\d+)?/);
+    if (!match) {
+      return null;
+    }
+    const parsed = Number.parseFloat(match[0]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function firstAvailableNumber(values) {
+    for (const value of values) {
+      const parsed = firstFiniteNumber(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  function numericParsedValue(parsed, key) {
+    const normalized = normalizeLabel(key);
+    if (!parsed || !normalized) {
+      return null;
+    }
+    const meta = parsed.currentValueMeta && typeof parsed.currentValueMeta === "object"
+      ? parsed.currentValueMeta
+      : {};
+    const metaKey = Object.keys(meta).find((candidate) => normalizeLabel(candidate) === normalized);
+    if (metaKey && meta[metaKey]) {
+      const current = firstFiniteNumber(meta[metaKey].currentValue);
+      if (meta[metaKey].hasCurrent && Number.isFinite(current)) {
+        return current;
+      }
+      const base = firstFiniteNumber(meta[metaKey].baseValue);
+      if (meta[metaKey].hasBase && Number.isFinite(base)) {
+        return base;
+      }
+    }
+    const values = parsed.currentValues && typeof parsed.currentValues === "object"
+      ? parsed.currentValues
+      : {};
+    const valueKey = Object.keys(values).find((candidate) => normalizeLabel(candidate) === normalized);
+    return valueKey ? firstFiniteNumber(values[valueKey]) : null;
+  }
+
+  function tokenHp(token) {
+    const hp = token && token.hp && typeof token.hp === "object" ? token.hp : null;
+    const entity = tokenSourceEntity(token);
+    const parsed = (entity && entity.parsedSheet) || {};
+    const maxValue = firstAvailableNumber([
+      hp && hp.max,
+      parsed.maxHp,
+      numericParsedValue(parsed, "max hp"),
+      numericParsedValue(parsed, "hp"),
+      1,
+    ]);
+    const max = Math.max(
+      1,
+      Math.round(maxValue || 1)
+    );
+    const currentValue = firstAvailableNumber([
+      hp && hp.current,
+      numericParsedValue(parsed, "current hp"),
+      numericParsedValue(parsed, "hp"),
+      max,
+    ]);
+    const current = clamp(
+      Math.round(Number.isFinite(currentValue) ? currentValue : max),
+      0,
+      max
+    );
+    return { current, max };
+  }
+
   function formatStatKey(key) {
     return String(key || "")
       .split(" ")
@@ -2904,18 +3097,6 @@
       elements.characterSelect.value = character.id || "";
     }
     renderCharacterPanels(character);
-    const rollValue = character && character.id ? `character:${character.id}` : "";
-    if (
-      rollValue &&
-      Array.from(elements.rollEntitySelect.options).some((option) => option.value === rollValue)
-    ) {
-      elements.rollEntitySelect.value = rollValue;
-      state.checkedSelfModifiers.clear();
-      state.checkedApprovedModifierIds.clear();
-      state.lastRollSkillKey = null;
-      renderRollSkillOptions();
-      renderRollModifiers();
-    }
   }
 
   function selectCharacterById(characterId, availableCharacters, shouldPopulate = true) {
@@ -3798,6 +3979,54 @@
       return;
     }
     renderStatGrid(elements.tokenInfoInline, tokenInfoPairs(token));
+    if (!canCurrentUserControlToken(token)) {
+      return;
+    }
+    elements.tokenInfoInline.appendChild(createTokenHpEditor(token, "tt-token-hp-editor"));
+  }
+
+  function keepTokenInfoInteraction(event) {
+    event.stopPropagation();
+  }
+
+  function createTokenHpEditor(token, className) {
+    const hp = tokenHp(token);
+    const editor = document.createElement("div");
+    editor.className = className || "tt-token-hp-editor";
+    ["pointerdown", "mousedown", "click", "dblclick"].forEach((eventName) => {
+      editor.addEventListener(eventName, keepTokenInfoInteraction);
+    });
+
+    const currentInput = document.createElement("input");
+    currentInput.type = "number";
+    currentInput.min = "0";
+    currentInput.value = String(hp.current);
+    currentInput.title = "Current HP";
+    editor.appendChild(currentInput);
+
+    const maxInput = document.createElement("input");
+    maxInput.type = "number";
+    maxInput.min = "1";
+    maxInput.value = String(hp.max);
+    maxInput.title = "Max HP";
+    editor.appendChild(maxInput);
+
+    const save = document.createElement("button");
+    save.type = "button";
+    save.textContent = "HP";
+    save.title = "Save HP";
+    save.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      emit("token:updateHp", {
+        tokenId: token.id,
+        current: Number.parseInt(currentInput.value, 10) || 0,
+        max: Math.max(1, Number.parseInt(maxInput.value, 10) || hp.max || 1),
+      });
+      setStatus("Updating token HP...");
+    });
+    editor.appendChild(save);
+    return editor;
   }
 
   function renderTokenPanel() {
@@ -3977,35 +4206,62 @@
 
     elements.initiativeOrderList.innerHTML = "";
     initiative.order.forEach((entry, index) => {
+      const token = getTokenById(entry.tokenId);
+      const isDeleted = Boolean(entry.deleted || !token);
       const row = document.createElement("div");
-      row.className = "tt-list-item";
+      row.className = "tt-list-item tt-initiative-row";
+      row.dataset.tokenId = entry.tokenId || "";
       if (index === currentIndex) {
-        row.style.borderColor = "#d9a441";
+        row.classList.add("is-current");
+      }
+      if (isDeleted) {
+        row.classList.add("is-deleted");
+      }
+      if (token && canCurrentUserInspectToken(token)) {
+        row.classList.add("is-selectable");
+        row.title = "Select token on map";
+        row.addEventListener("click", (event) => {
+          if (event.target && event.target.closest && event.target.closest("input, button")) {
+            return;
+          }
+          state.lightingUi.tokenInfoTokenId = token.id;
+          if (canCurrentUserControlToken(token)) {
+            resetTokenMoveQueue();
+            state.selectedTokenIds.clear();
+            state.selectedTokenIds.add(token.id);
+          }
+          renderTokenPanel();
+          renderMapGrid();
+        });
       }
 
       const left = document.createElement("span");
+      left.className = "tt-initiative-name";
       left.textContent = `${index + 1}. ${entry.name}`;
       row.appendChild(left);
 
       if (isDm()) {
         const controls = document.createElement("div");
-        controls.className = "tt-row";
+        controls.className = "tt-initiative-controls";
 
         const totalInput = document.createElement("input");
         totalInput.type = "number";
         totalInput.value = String(Number(entry.total) || 0);
-        totalInput.style.maxWidth = "64px";
+        totalInput.title = "Initiative total";
+        totalInput.disabled = isDeleted;
         controls.appendChild(totalInput);
 
         const modInput = document.createElement("input");
         modInput.type = "number";
         modInput.value = String(Number(entry.initiativeMod) || 0);
-        modInput.style.maxWidth = "64px";
+        modInput.title = "Initiative bonus";
+        modInput.disabled = isDeleted;
         controls.appendChild(modInput);
 
         const apply = document.createElement("button");
         apply.type = "button";
         apply.textContent = "Save";
+        apply.disabled = isDeleted;
         apply.addEventListener("click", () => {
           emit("initiative:updateEntry", {
             tokenId: entry.tokenId,
@@ -4020,7 +4276,9 @@
         const right = document.createElement("span");
         right.className = "tt-log-meta";
         const initiativeMod = Number(entry.initiativeMod) || 0;
-        right.textContent = `${entry.total} (${entry.roll}${initiativeMod >= 0 ? "+" : ""}${initiativeMod})`;
+        right.textContent = isDeleted
+          ? "removed"
+          : `${entry.total} (${entry.roll}${initiativeMod >= 0 ? "+" : ""}${initiativeMod})`;
         row.appendChild(right);
       }
 
@@ -4204,6 +4462,7 @@
     }
 
     if (state.selectedTokenIds.size > 1) {
+      resetTokenMoveQueue();
       state.selectedTokenIds.clear();
       renderSelectedTokenControls();
       renderMapGrid();
@@ -4815,6 +5074,10 @@
 
     const cellSize = window.innerWidth < 860 ? 34 : 40;
     state.tool.cellSize = cellSize;
+    if (elements.mapGridWrap) {
+      elements.mapGridWrap.style.setProperty("--tt-cell-size", `${cellSize}px`);
+      elements.mapGridWrap.style.setProperty("--tt-grid-line", "1px");
+    }
 
     elements.mapGridCells.style.gridTemplateColumns = `repeat(${map.cols}, ${cellSize}px)`;
     elements.mapGridCells.style.gridTemplateRows = `repeat(${map.rows}, ${cellSize}px)`;
@@ -4859,6 +5122,7 @@
           }
           if (isTokenInteractionAllowed()) {
             event.preventDefault();
+            startTargetLongPress(x, y, event);
             beginDragSelect(event);
           }
         });
@@ -4963,6 +5227,18 @@
         tokenEl.textContent = initials(token.name);
       }
 
+      const hp = tokenHp(token);
+      if (hp.max > 0) {
+        const hpBar = document.createElement("div");
+        hpBar.className = "tt-token-hp-bar";
+        hpBar.title = `HP ${hp.current}/${hp.max}`;
+        const hpFill = document.createElement("div");
+        hpFill.className = "tt-token-hp-fill";
+        hpFill.style.width = `${clamp((hp.current / hp.max) * 100, 0, 100)}%`;
+        hpBar.appendChild(hpFill);
+        tokenEl.appendChild(hpBar);
+      }
+
       const nameEl = document.createElement("div");
       nameEl.className = "tt-token-name";
       nameEl.textContent = token.name;
@@ -5017,8 +5293,10 @@
             }
           } else {
             if (state.selectedTokenIds.has(token.id) && state.selectedTokenIds.size === 1) {
+              resetTokenMoveQueue();
               state.selectedTokenIds.clear();
             } else {
+              resetTokenMoveQueue();
               state.selectedTokenIds.clear();
               state.selectedTokenIds.add(token.id);
             }
@@ -5086,6 +5364,9 @@
         if (pairs.length > 0) {
           const popover = document.createElement("div");
           popover.className = "tt-token-popover";
+          ["pointerdown", "mousedown", "click", "dblclick"].forEach((eventName) => {
+            popover.addEventListener(eventName, keepTokenInfoInteraction);
+          });
           pairs.forEach((pair) => {
             const row = document.createElement("div");
             row.className = "tt-token-popover-row";
@@ -5099,6 +5380,9 @@
             row.appendChild(value);
             popover.appendChild(row);
           });
+          if (canCurrentUserControlToken(token)) {
+            popover.appendChild(createTokenHpEditor(token, "tt-token-popover-hp-editor"));
+          }
           holder.appendChild(popover);
         }
       }
@@ -5302,8 +5586,9 @@
       return "";
     };
     const vision = normalizeTokenVisionConfig(token && token.vision);
+    const hp = tokenHp(token);
     const pairs = [
-      { key: "Current HP", value: readStat("current hp", "hp") },
+      { key: "HP", value: `${hp.current}/${hp.max}` },
       { key: "AC", value: readStat("ac") },
       { key: "Current Mana", value: readStat("current mana", "mana") },
       { key: "Speed", value: readStat("speed") || token.movementMax },
@@ -5377,6 +5662,7 @@
     if (state.selectedTokenIds.size === 0) {
       return false;
     }
+    resetTokenMoveQueue();
     state.selectedTokenIds.clear();
     renderSelectedTokenControls();
     return true;
@@ -5460,20 +5746,91 @@
     return true;
   }
 
-  function moveSelectedTokenBy(dx, dy) {
+  function resetTokenMoveQueue() {
+    if (state.tokenMoveQueue.timer) {
+      clearTimeout(state.tokenMoveQueue.timer);
+    }
+    state.tokenMoveQueue.tokenId = null;
+    state.tokenMoveQueue.steps = [];
+    state.tokenMoveQueue.inFlight = null;
+    state.tokenMoveQueue.timer = null;
+  }
+
+  function tokenMoveTargetFits(token, targetX, targetY, map = activeMap()) {
+    if (!token || !map) {
+      return false;
+    }
+    const size = tokenSizeSquares(token);
+    return targetX >= 0 && targetX + size <= map.cols && targetY >= 0 && targetY + size <= map.rows;
+  }
+
+  function processTokenMoveQueue() {
+    const queue = state.tokenMoveQueue;
+    if (queue.inFlight || queue.steps.length === 0) {
+      return;
+    }
+    const token = getTokenById(queue.tokenId);
+    const map = activeMap();
+    if (!token || !map || !canCurrentUserControlToken(token)) {
+      resetTokenMoveQueue();
+      return;
+    }
+    const step = queue.steps.shift();
+    const targetX = token.x + step.dx;
+    const targetY = token.y + step.dy;
+    if (!tokenMoveTargetFits(token, targetX, targetY, map)) {
+      processTokenMoveQueue();
+      return;
+    }
+    queue.inFlight = {
+      tokenId: token.id,
+      x: targetX,
+      y: targetY,
+      createdAt: Date.now(),
+    };
+    emit("token:move", { tokenId: token.id, x: targetX, y: targetY });
+    queue.timer = setTimeout(() => {
+      resetTokenMoveQueue();
+    }, 2500);
+  }
+
+  function enqueueSelectedTokenMove(dx, dy) {
     const token = selectedControllableToken();
     const map = activeMap();
     if (!token || !map) {
       return false;
     }
-    const targetX = token.x + dx;
-    const targetY = token.y + dy;
-    const size = tokenSizeSquares(token);
-    if (targetX < 0 || targetX + size > map.cols || targetY < 0 || targetY + size > map.rows) {
-      return false;
+    if (state.tokenMoveQueue.tokenId && state.tokenMoveQueue.tokenId !== token.id) {
+      resetTokenMoveQueue();
     }
-    emit("token:move", { tokenId: token.id, x: targetX, y: targetY });
+    state.tokenMoveQueue.tokenId = token.id;
+    state.tokenMoveQueue.steps.push({ dx, dy });
+    processTokenMoveQueue();
     return true;
+  }
+
+  function reconcileTokenMoveQueue() {
+    const queue = state.tokenMoveQueue;
+    if (!queue.tokenId) {
+      return;
+    }
+    const token = getTokenById(queue.tokenId);
+    if (!token || !canCurrentUserControlToken(token)) {
+      resetTokenMoveQueue();
+      return;
+    }
+    if (!queue.inFlight) {
+      processTokenMoveQueue();
+      return;
+    }
+    if (Number(token.x) === queue.inFlight.x && Number(token.y) === queue.inFlight.y) {
+      if (queue.timer) {
+        clearTimeout(queue.timer);
+      }
+      queue.inFlight = null;
+      queue.timer = null;
+      processTokenMoveQueue();
+    }
   }
 
   const HIDDEN_SELF_MODIFIERS = new Set(["bottled_luck"]);
@@ -5901,6 +6258,23 @@
     return parts.join(" | ");
   }
 
+  function diceCommandText(details) {
+    const terms = details && Array.isArray(details.terms) ? details.terms : [];
+    if (terms.length === 0) {
+      return "";
+    }
+    return terms
+      .map((term, index) => {
+        const prefix = term.sign < 0 ? "-" : index === 0 ? "" : "+";
+        if (term.type === "dice") {
+          const dice = Array.isArray(term.dice) ? term.dice.join(", ") : "";
+          return `${prefix}${term.notation} [${dice}] => ${formatRollNumber(term.chosen)}`;
+        }
+        return `${prefix}${term.notation}`;
+      })
+      .join(" ");
+  }
+
   function parseEntitySelectValue(value) {
     const raw = String(value || "");
     const separator = raw.indexOf(":");
@@ -5935,7 +6309,7 @@
   }
 
   function renderRollEntityOptions() {
-    const currentValue = elements.rollEntitySelect.value;
+    const currentValue = state.selectedRollEntityValue || elements.rollEntitySelect.value;
     elements.rollEntitySelect.innerHTML = "";
 
     const options = [];
@@ -5959,16 +6333,14 @@
       elements.rollEntitySelect.appendChild(option);
     });
 
-    const preferredCharacter = state.selectedCharacterId
-      ? `character:${state.selectedCharacterId}`
-      : "";
-    if (preferredCharacter && options.some((entry) => entry.value === preferredCharacter)) {
-      elements.rollEntitySelect.value = preferredCharacter;
-    } else if (options.some((entry) => entry.value === currentValue)) {
+    if (options.some((entry) => entry.value === currentValue)) {
       elements.rollEntitySelect.value = currentValue;
     } else if (options.length > 0) {
       elements.rollEntitySelect.value = options[0].value;
+    } else {
+      elements.rollEntitySelect.value = "";
     }
+    state.selectedRollEntityValue = elements.rollEntitySelect.value || "";
     renderRollSkillOptions();
     renderRollModifiers();
   }
@@ -6305,6 +6677,13 @@
             `ISDC check: ${rollData.isdcCheck.total}/${rollData.isdcCheck.dc} (${rollData.isdcCheck.passed ? "pass" : "fail"})`;
           block.appendChild(isdcLine);
         }
+      }
+
+      if (entry.type === "roll" && entry.details && entry.details.kind === "dice-command") {
+        const diceLine = document.createElement("div");
+        diceLine.className = "tt-log-meta";
+        diceLine.textContent = `dice: ${diceCommandText(entry.details)} | total ${formatRollNumber(entry.details.total)}`;
+        block.appendChild(diceLine);
       }
 
       elements.logEntries.appendChild(block);
@@ -7124,6 +7503,7 @@
   });
 
   elements.rollEntitySelect.addEventListener("change", () => {
+    state.selectedRollEntityValue = elements.rollEntitySelect.value || "";
     state.checkedSelfModifiers.clear();
     state.checkedApprovedModifierIds.clear();
     state.approvedModifierEntries = [];
@@ -7319,7 +7699,9 @@
   }
 
   window.addEventListener("mousemove", (event) => {
+    updateTargetLongPress(event);
     if (updateTokenDrag(event)) {
+      cancelTargetLongPress();
       return;
     }
     continueMapPan(event);
@@ -7335,6 +7717,7 @@
   });
 
   window.addEventListener("mouseup", (event) => {
+    cancelTargetLongPress();
     stopPaintDrag();
     endMeasureDrag();
     stopMapPan();
@@ -7351,7 +7734,15 @@
 
   window.addEventListener("keydown", (event) => {
     const focused = document.activeElement;
-    if (focused && (focused.tagName === "INPUT" || focused.tagName === "TEXTAREA" || focused.isContentEditable)) {
+    if (
+      focused &&
+      (
+        focused.tagName === "INPUT" ||
+        focused.tagName === "TEXTAREA" ||
+        focused.tagName === "SELECT" ||
+        focused.isContentEditable
+      )
+    ) {
       return;
     }
 
@@ -7373,7 +7764,7 @@
         return;
       }
       const [dx, dy] = movementByKey[event.key];
-      if (moveSelectedTokenBy(dx, dy)) {
+      if (enqueueSelectedTokenMove(dx, dy)) {
         event.preventDefault();
       }
       return;
@@ -7476,11 +7867,15 @@
     if (snapshot && snapshot.auth && snapshot.auth.sessionToken) {
       localStorage.setItem(STORAGE_SESSION_KEY, snapshot.auth.sessionToken);
     }
+    reconcileTokenMoveQueue();
     renderAll();
   });
 
   socket.on("tabletop:error", (payload) => {
     const message = payload && payload.message ? payload.message : "Unknown error";
+    if (/move|tile|path/i.test(message)) {
+      resetTokenMoveQueue();
+    }
     setStatus(message, true);
     if (/uses remaining/i.test(message)) {
       window.alert(message);
@@ -7575,6 +7970,7 @@
       const wantedValue = `character:${first.id}`;
       if (Array.from(elements.rollEntitySelect.options).some((option) => option.value === wantedValue)) {
         elements.rollEntitySelect.value = wantedValue;
+        state.selectedRollEntityValue = wantedValue;
       }
     }
     state.lastRollSkillKey = null;
@@ -7596,7 +7992,7 @@
     }
     const injury = payload.injuryCheck.passed
       ? "No injury"
-      : `${payload.injuryCheck.tier}: ${payload.injuryCheck.injury}`;
+      : `${payload.injuryCheck.tier}: ${payload.injuryCheck.injury}${payload.injuryCheck.effect ? ` - ${payload.injuryCheck.effect}` : ""}`;
     const text = `${payload.entityName} | death check ${payload.deathCheck.total}/${payload.deathCheck.dc} (${payload.deathCheck.passed ? "pass" : "fail"}) | injury ${payload.injuryCheck.total}/${payload.injuryCheck.dc}: ${injury}`;
     elements.injuryResult.textContent = text;
   });

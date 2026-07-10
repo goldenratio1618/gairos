@@ -301,6 +301,32 @@ body {
   will-change: transform;
 }
 
+.tt-grid-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.26) 0,
+      rgba(255, 255, 255, 0.26) 1px,
+      transparent 1px,
+      transparent calc(var(--tt-cell-size, 40px) + var(--tt-grid-line, 1px))
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.26) 0,
+      rgba(255, 255, 255, 0.26) 1px,
+      transparent 1px,
+      transparent calc(var(--tt-cell-size, 40px) + var(--tt-grid-line, 1px))
+    );
+  background-size:
+    calc(var(--tt-cell-size, 40px) + var(--tt-grid-line, 1px))
+      calc(var(--tt-cell-size, 40px) + var(--tt-grid-line, 1px));
+}
+
 .tt-grid-wrap.tt-mode-paint .tt-token {
   filter: grayscale(1);
   opacity: 0.5;
@@ -909,6 +935,26 @@ body {
   object-fit: cover;
 }
 
+.tt-token-hp-bar {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.74);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.tt-token-hp-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #46b16d, #d2c354);
+}
+
 .tt-token-selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(217, 164, 65, 0.35);
@@ -955,7 +1001,7 @@ body {
   border-radius: 9px;
   background: rgba(7, 10, 9, 0.94);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.38);
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 4;
 }
 
@@ -988,11 +1034,11 @@ body {
   height: 100%;
   pointer-events: none;
   overflow: visible;
-  z-index: 40;
+  z-index: 100;
 }
 
 .tt-measure-overlay line {
-  stroke: #f3c56e;
+  stroke: #ff0000;
   stroke-width: 2;
   stroke-dasharray: 6 4;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85));
@@ -1001,11 +1047,12 @@ body {
 .tt-measure-overlay polygon,
 .tt-measure-overlay circle,
 .tt-measure-overlay rect,
+.tt-measure-overlay line,
 .tt-measure-overlay path {
-  stroke: #f3c56e;
+  stroke: #ff0000;
   stroke-width: 2;
   stroke-dasharray: 6 4;
-  fill: rgba(243, 197, 110, 0.15);
+  fill: rgba(255, 0, 0, 0.15);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85));
 }
 
@@ -1034,6 +1081,7 @@ body {
   position: absolute;
   transform: translate(-50%, -130%);
   pointer-events: none;
+  z-index: 101;
   padding: 2px 6px;
   border-radius: 7px;
   border: 1px solid rgba(217, 164, 65, 0.75);
@@ -1166,6 +1214,62 @@ body {
   font-size: 0.72rem;
 }
 
+#combat-card:not(.tt-menu-hidden) {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+}
+
+#initiative-order-list {
+  max-height: none;
+  min-height: 0;
+  align-content: start;
+}
+
+.tt-initiative-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.tt-initiative-row.is-current {
+  border-color: #d9a441;
+}
+
+.tt-initiative-row.is-deleted {
+  opacity: 0.58;
+}
+
+.tt-initiative-row.is-deleted .tt-initiative-name {
+  text-decoration: line-through;
+}
+
+.tt-initiative-row.is-selectable {
+  cursor: pointer;
+}
+
+.tt-initiative-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tt-initiative-controls {
+  display: grid;
+  grid-template-columns: 54px 54px 46px;
+  gap: 5px;
+  align-items: center;
+}
+
+.tt-initiative-controls input {
+  min-width: 0;
+  padding: 4px 5px;
+}
+
+.tt-initiative-controls button {
+  min-width: 0;
+}
+
 .tt-roster-token {
   display: inline-grid;
   place-items: center;
@@ -1241,6 +1345,35 @@ body {
 .tt-stat-value {
   font-size: 0.9rem;
   color: var(--text);
+}
+
+.tt-token-hp-editor {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px;
+  gap: 6px;
+}
+
+.tt-token-hp-editor input {
+  min-width: 0;
+}
+
+.tt-token-popover-hp-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
+  gap: 5px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.tt-token-popover-hp-editor input {
+  min-width: 0;
+  padding: 4px 5px;
+}
+
+.tt-token-popover-hp-editor button {
+  min-width: 0;
+  padding: 4px 5px;
 }
 
 .tt-grid2 {
