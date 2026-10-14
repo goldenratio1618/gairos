@@ -13,16 +13,26 @@
   const DEFAULT_DRAWING_COLOR = "#ff0000";
   const MAX_LIGHT_RADIUS_FEET = 10_000;
   const TOKEN_SIZE_SQUARES = {
+    fine: 1,
+    diminutive: 1,
+    tiny: 1,
+    small: 1,
     medium: 1,
     large: 2,
     huge: 3,
     gargantuan: 4,
+    colossal: 6,
   };
   const TOKEN_SIZE_LABELS = {
+    fine: "Fine (1 cell)",
+    diminutive: "Diminutive (1 cell)",
+    tiny: "Tiny (1 cell)",
+    small: "Small (1 cell)",
     medium: "Medium (1x1)",
     large: "Large (2x2)",
     huge: "Huge (3x3)",
     gargantuan: "Gargantuan (4x4)",
+    colossal: "Colossal (6x6)",
   };
 
   const elements = {
@@ -2858,6 +2868,10 @@
     if (/gargantuan|garg/.test(normalized)) {
       return "gargantuan";
     }
+    if (/\bcolossal\b/.test(normalized)) return "colossal";
+    for (const size of ["fine", "diminutive", "tiny", "small"]) {
+      if (new RegExp(`\\b${size}\\b`).test(normalized)) return size;
+    }
     if (/\bhuge\b/.test(normalized)) {
       return "huge";
     }
@@ -3437,6 +3451,10 @@
       editButton.type = "button";
       editButton.textContent = "Edit";
       editButton.addEventListener("click", () => {
+        if (statblock.mode === "generated" && statblock.monster) {
+          window.GairosMonsterBuilder.open(statblock);
+          return;
+        }
         elements.statblockId.value = statblock.id;
         elements.statblockName.value = statblock.name || "";
         elements.statblockMode.value = statblock.mode || "column";
@@ -7059,6 +7077,32 @@
     resetStatblockForm();
   });
 
+  if (window.GairosMonsterBuilder) {
+    const launch = document.createElement("button");
+    launch.type = "button";
+    launch.className = "monster-launch";
+    launch.textContent = "Create monster";
+    launch.addEventListener("click", () => window.GairosMonsterBuilder.open());
+    elements.statblockList.before(launch);
+    window.GairosMonsterBuilder.configure({
+      isDm,
+      onSave: (payload) => new Promise((resolve, reject) => {
+        socket.timeout(10000).emit("statblock:save", payload, (error, result) => {
+          if (error) return reject(new Error("Save was not confirmed. Check the library before retrying."));
+          if (!result || !result.ok) return reject(new Error(result?.error || "Could not save monster."));
+          setStatus(`Saved ${payload.name}. Find it in Tokens to place it on the map.`);
+          resolve(result);
+        });
+      }),
+    });
+    const sizeSelect = elements.tokenConfigSize;
+    if (sizeSelect) {
+      for (const size of ["fine", "diminutive", "tiny", "small", "colossal"]) {
+        const option = document.createElement("option"); option.value = size; option.textContent = TOKEN_SIZE_LABELS[size]; sizeSelect.appendChild(option);
+      }
+    }
+  }
+
   if (elements.mapNew) {
     elements.mapNew.addEventListener("click", () => {
       const maps = (state.snapshot && state.snapshot.maps) || [];
@@ -7848,6 +7892,7 @@
   socket.on("tabletop:state", (snapshot) => {
     const previousMapId = activeMap() ? activeMap().id || null : null;
     state.snapshot = snapshot;
+    window.GairosMonsterBuilder?.syncRole();
     if (state.snapshot && state.snapshot.scene && state.snapshot.scene.map) {
       Array.from(state.terrain.pendingChanges.entries()).forEach(([key, change]) => {
         const layer = terrainLayerById(change.layerId, state.snapshot.scene.map);

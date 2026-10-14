@@ -6,63 +6,69 @@
     <title>Gairos Tabletop - DM</title>
     <link rel="icon" type="image/svg+xml" href="/tabletop-icons/combat.svg" />
     <link rel="stylesheet" href="/tabletop.css" />
+    <link rel="stylesheet" href="/monster-builder.css" />
   </head>
   <body data-default-role="dm">
     <div id="tabletop-root" class="tt-root">
-      <aside class="tt-mode-rail">
+      <aside class="tt-mode-rail" aria-label="Tabletop navigation">
         <button
           id="menu-toggle"
           type="button"
           class="tt-rail-button tt-rail-menu"
           title="Toggle Toolbar"
           aria-label="Toggle Toolbar"
+          aria-controls="tabletop-tools"
           data-tooltip="Toggle Toolbar"
         >
           <span class="tt-hamburger" aria-hidden="true"><span></span><span></span><span></span></span>
         </button>
         <div class="tt-rail-divider"></div>
-        <button id="rail-account" type="button" class="tt-rail-button" title="Account" data-tooltip="Account">
+        <button aria-label="Account" id="rail-account" type="button" class="tt-rail-button" title="Account" data-tooltip="Account">
           <img src="/tabletop-icons/account.svg" alt="" />
         </button>
-        <button id="rail-campaigns" type="button" class="tt-rail-button" title="Campaigns" data-tooltip="Campaigns">
+        <button aria-label="Campaigns" id="rail-campaigns" type="button" class="tt-rail-button" title="Campaigns" data-tooltip="Campaigns">
           <img src="/tabletop-icons/campaigns.svg" alt="" />
         </button>
-        <button id="rail-character" type="button" class="tt-rail-button" title="Character" data-tooltip="Character">
+        <button aria-label="Character" id="rail-character" type="button" class="tt-rail-button" title="Character" data-tooltip="Character">
           <img src="/tabletop-icons/character.svg" alt="" />
         </button>
-        <button id="rail-rolls" type="button" class="tt-rail-button" title="Rolls" data-tooltip="Rolls">
+        <button aria-label="Rolls" id="rail-rolls" type="button" class="tt-rail-button" title="Rolls" data-tooltip="Rolls">
           <img src="/tabletop-icons/rolls.svg" alt="" />
         </button>
-        <button id="rail-combat" type="button" class="tt-rail-button" title="Combat" data-tooltip="Combat">
+        <button aria-label="Combat" id="rail-combat" type="button" class="tt-rail-button" title="Combat" data-tooltip="Combat">
           <img src="/tabletop-icons/combat.svg" alt="" />
         </button>
-        <button id="rail-utilities" type="button" class="tt-rail-button" title="Utilities" data-tooltip="Utilities">
+        <button aria-label="Utilities" id="rail-utilities" type="button" class="tt-rail-button" title="Utilities" data-tooltip="Utilities">
           <img src="/tabletop-icons/utilities.svg" alt="" />
         </button>
         <div class="tt-rail-divider"></div>
-        <button id="rail-tokens" type="button" class="tt-rail-button" title="Tokens" data-tooltip="Tokens">
+        <button aria-label="Tokens" id="rail-tokens" type="button" class="tt-rail-button" title="Tokens" data-tooltip="Tokens">
           <img src="/tabletop-icons/character.svg" alt="" />
         </button>
-        <button id="rail-terrain" type="button" class="tt-rail-button tt-hidden" title="Terrain" data-tooltip="Terrain">
+        <button aria-label="Terrain" id="rail-terrain" type="button" class="tt-rail-button tt-hidden" title="Terrain" data-tooltip="Terrain">
           <img src="/tabletop-icons/battlemaps.svg" alt="" />
         </button>
-        <button id="rail-lighting" type="button" class="tt-rail-button tt-hidden" title="Lighting" data-tooltip="Lighting">
+        <button aria-label="Lighting" id="rail-lighting" type="button" class="tt-rail-button tt-hidden" title="Lighting" data-tooltip="Lighting">
           <img src="/tabletop-icons/lighting.svg" alt="" />
         </button>
       </aside>
 
-      <aside class="tt-left">
+      <aside class="tt-left" id="tabletop-tools" aria-label="Tabletop tools">
         <section class="tt-card tt-panel" id="auth-card" data-menu-panel="account">
           <h2>Account</h2>
-          <div id="auth-status">Connecting...</div>
+          <div id="auth-status" role="status">Connecting...</div>
           <div id="auth-forms">
             <form id="login-form" class="tt-form">
+              <label class="tt-field" for="login-username">Username</label>
               <input id="login-username" type="text" placeholder="Username" autocomplete="username" />
+              <label class="tt-field" for="login-password">Password</label>
               <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" />
               <button type="submit">Login</button>
             </form>
             <form id="register-form" class="tt-form">
+              <label class="tt-field" for="register-username">New username</label>
               <input id="register-username" type="text" placeholder="New username" autocomplete="username" />
+              <label class="tt-field" for="register-password">New password</label>
               <input id="register-password" type="password" placeholder="New password" autocomplete="new-password" />
               <button type="submit">Create Account</button>
             </form>
@@ -83,9 +89,9 @@
         <section class="tt-card tt-panel" id="character-card" data-menu-panel="character">
           <h2>Characters</h2>
           <div class="tt-grid3 tt-inline-controls">
-            <select id="character-select"></select>
-            <button id="character-new-button" type="button" class="tt-icon-button" title="New Character">+</button>
-            <button id="character-delete-button" type="button" class="tt-icon-button tt-danger" title="Delete Character">
+            <select id="character-select" aria-label="Select character"></select>
+            <button aria-label="New Character" id="character-new-button" type="button" class="tt-icon-button" title="New Character">+</button>
+            <button aria-label="Delete Character" id="character-delete-button" type="button" class="tt-icon-button tt-danger" title="Delete Character">
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" width="14" height="14" aria-hidden="true"><path d="M4 5h12" stroke-linecap="round"/><path d="M8 5V3h4v2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5l1 12h6l1-12" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="9" x2="9" y2="15" stroke-linecap="round"/><line x1="11" y1="9" x2="11" y2="15" stroke-linecap="round"/></svg>
             </button>
           </div>
@@ -142,9 +148,9 @@
         <section class="tt-card tt-hidden tt-panel" id="map-card" data-menu-panel="terrain">
           <h2>Terrain (DM)</h2>
           <div class="tt-grid3 tt-inline-controls">
-            <select id="map-select"></select>
-            <button id="map-new" type="button" class="tt-icon-button" title="New Map">+</button>
-            <button id="map-delete" type="button" class="tt-icon-button tt-danger" title="Delete Map">
+            <select id="map-select" aria-label="Select map"></select>
+            <button aria-label="New Map" id="map-new" type="button" class="tt-icon-button" title="New Map">+</button>
+            <button aria-label="Delete Map" id="map-delete" type="button" class="tt-icon-button tt-danger" title="Delete Map">
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" width="14" height="14" aria-hidden="true"><path d="M4 5h12" stroke-linecap="round"/><path d="M8 5V3h4v2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5l1 12h6l1-12" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="9" x2="9" y2="15" stroke-linecap="round"/><line x1="11" y1="9" x2="11" y2="15" stroke-linecap="round"/></svg>
             </button>
           </div>
@@ -178,7 +184,7 @@
               <div id="terrain-active-layer" class="tt-inline-value">No layer selected</div>
               <div id="terrain-layer-list" class="tt-list tt-terrain-layer-list"></div>
               <div class="tt-grid2">
-                <select id="terrain-layer-new-type">
+                <select id="terrain-layer-new-type" aria-label="New terrain layer type">
                   <option value="background">Background Layer</option>
                   <option value="foreground">Foreground Layer</option>
                   <option value="gm">GM Layer</option>
@@ -206,7 +212,7 @@
               <button type="button" class="tt-seg" data-value="text">Text</button>
               <button type="button" class="tt-seg" data-value="door">Door</button>
             </div>
-            <button id="terrain-undo" type="button" class="tt-icon-button" title="Undo terrain edit (Ctrl+Z)">Undo</button>
+            <button aria-label="Undo terrain edit (Ctrl+Z)" id="terrain-undo" type="button" class="tt-icon-button" title="Undo terrain edit (Ctrl+Z)">Undo</button>
           </div>
 
           <div class="tt-grid2 tt-terrain-option-grid">
@@ -277,8 +283,8 @@
           <div class="tt-mapctrl">
             <div class="tt-mapctrl-label">Token Layer</div>
             <div class="tt-seg-group" id="layer-group">
-              <button type="button" class="tt-seg tt-seg-active" data-value="tokens" title="Place on tokens layer">Tokens</button>
-              <button type="button" class="tt-seg" data-value="gm" title="GM hidden layer">GM</button>
+              <button aria-label="Place on tokens layer" type="button" class="tt-seg tt-seg-active" data-value="tokens" title="Place on tokens layer">Tokens</button>
+              <button aria-label="GM hidden layer" type="button" class="tt-seg" data-value="gm" title="GM hidden layer">GM</button>
             </div>
           </div>
           <div class="tt-mapctrl">
@@ -376,7 +382,7 @@
             <label class="tt-field" for="roll-skill-select">Skill</label>
             <select id="roll-skill-select"></select>
             <div class="tt-row">
-              <label>Roll Context</label>
+              <label for="roll-type-select">Roll Context</label>
               <select id="roll-type-select"></select>
             </div>
             <div class="tt-grid2">
@@ -414,8 +420,8 @@
             <details>
               <summary>Request Ally Modifier</summary>
               <div class="tt-grid2">
-                <select id="ally-source-user"></select>
-                <select id="ally-modifier-id"></select>
+                <select id="ally-source-user" aria-label="Ally providing modifier"></select>
+                <select id="ally-modifier-id" aria-label="Ally modifier"></select>
               </div>
               <button id="request-ally-modifier" type="button">Request Approval</button>
               <div id="approved-modifier-list" class="tt-list"></div>
@@ -455,7 +461,7 @@
         <section class="tt-card tt-hidden tt-panel" id="dm-tools-card" data-menu-panel="utilities">
           <h2>DM Tools</h2>
           <div class="tt-grid2">
-            <select id="forage-terrain">
+            <select id="forage-terrain" aria-label="Foraging terrain">
               <option value="forest">Forest</option>
               <option value="swamp">Swamp</option>
               <option value="desert">Desert</option>
@@ -467,7 +473,7 @@
             <button id="forage-roll" type="button">Forage</button>
           </div>
           <div class="tt-grid2">
-            <input id="group-roll-skill" type="text" placeholder="Group roll skill" />
+            <input id="group-roll-skill" aria-label="Group roll skill" type="text" placeholder="Group roll skill" />
             <button id="group-roll-send" type="button">Ask All Players to Roll</button>
           </div>
         </section>
@@ -506,7 +512,7 @@
 
       </aside>
 
-      <main class="tt-main">
+      <main class="tt-main" aria-label="Battle map">
         <section class="tt-board" id="board-wrap">
           <div id="map-grid-wrap" class="tt-grid-wrap">
             <div id="map-grid-cells" class="tt-grid"></div>
@@ -522,17 +528,17 @@
             <div id="map-select-box" class="tt-select-box tt-hidden"></div>
           </div>
         </section>
-        <div id="main-status" class="tt-map-status tt-hidden"></div>
+        <div id="main-status" class="tt-map-status tt-hidden" role="status"></div>
       </main>
 
-      <aside class="tt-right" id="log-panel">
+      <aside class="tt-right" id="log-panel" aria-label="Session log and chat">
         <div class="tt-log-header">
           <h2>Session Log</h2>
           <button id="log-toggle" class="tt-log-toggle" type="button">Minimize</button>
         </div>
         <div id="log-entries" class="tt-log-entries"></div>
         <form id="chat-form" class="tt-chat-form">
-          <input id="chat-input" type="text" placeholder="Type chat or /r NdX..." />
+          <input id="chat-input" aria-label="Chat message or dice roll" type="text" placeholder="Type chat or /r NdX..." />
           <button type="submit">Send</button>
         </form>
       </aside>
@@ -543,7 +549,7 @@
       <div class="tt-modal-card">
         <div class="tt-modal-header">
           <h2 id="terrain-category-title">Choose Texture</h2>
-          <button id="terrain-category-close" type="button" class="tt-icon-button">×</button>
+          <button id="terrain-category-close" aria-label="Close texture picker" type="button" class="tt-icon-button">×</button>
         </div>
         <label class="tt-checkline">
           <input id="terrain-category-apply-global" type="checkbox" />
@@ -558,9 +564,9 @@
       <div class="tt-modal-card tt-modal-card-small">
         <div class="tt-modal-header">
           <h2>Uniform Color</h2>
-          <button id="terrain-color-close" type="button" class="tt-icon-button">×</button>
+          <button id="terrain-color-close" aria-label="Close color picker" type="button" class="tt-icon-button">×</button>
         </div>
-        <input id="terrain-color-input" type="color" value="#7f8c4a" />
+        <input id="terrain-color-input" aria-label="Terrain color" type="color" value="#7f8c4a" />
         <button id="terrain-color-confirm" type="button">Use Color</button>
       </div>
     </div>
@@ -570,7 +576,7 @@
       <div class="tt-modal-card tt-modal-card-small">
         <div class="tt-modal-header">
           <h2 id="token-info-title">Token Info</h2>
-          <button id="token-info-close" type="button" class="tt-icon-button">×</button>
+          <button id="token-info-close" aria-label="Close token information" type="button" class="tt-icon-button">×</button>
         </div>
         <div id="token-info-grid" class="tt-stat-grid"></div>
       </div>
@@ -581,7 +587,7 @@
       <div class="tt-modal-card tt-modal-card-small">
         <div class="tt-modal-header">
           <h2 id="token-config-title">Token Settings</h2>
-          <button id="token-config-close" type="button" class="tt-icon-button">×</button>
+          <button id="token-config-close" aria-label="Close token settings" type="button" class="tt-icon-button">×</button>
         </div>
         <input id="token-config-token-id" type="hidden" />
         <label class="tt-field" for="token-config-size">Size</label>
@@ -620,6 +626,9 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/monster-rules.js"></script>
+    <script src="/monster-token.js"></script>
+    <script src="/monster-builder.js"></script>
     <script src="/tabletop.js"></script>
   </body>
 </html>

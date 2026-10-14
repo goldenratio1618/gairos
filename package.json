@@ -6,7 +6,7 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "test": "node test/fov.test.js"
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "express": "^4.19.2",

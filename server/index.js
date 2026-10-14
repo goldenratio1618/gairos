@@ -3,6 +3,9 @@ const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
 const { createTabletopSystem } = require("./game/tabletop");
+const { createMonsterImageRouter, loadLocalEnv } = require("./game/monster-images");
+
+loadLocalEnv(path.join(__dirname, "..", ".env"));
 
 const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -85,7 +88,11 @@ function parseCookies(req) {
     if (!key) {
       return acc;
     }
-    acc[key] = decodeURIComponent(rest.join("="));
+    try {
+      acc[key] = decodeURIComponent(rest.join("="));
+    } catch {
+      // A malformed cookie is unauthenticated, not a server error.
+    }
     return acc;
   }, {});
 }
@@ -94,6 +101,9 @@ const app = express();
 app.set("trust proxy", false);
 app.use(privateOnly);
 app.use(express.urlencoded({ extended: false }));
+app.use("/api/dm/monster-image", createMonsterImageRouter({
+  isDm: (req) => parseCookies(req)[DM_COOKIE_NAME] === DM_PASSWORD,
+}));
 
 function serveDmPage(req, res, filename) {
   const cookies = parseCookies(req);
@@ -109,17 +119,22 @@ function serveDmPage(req, res, filename) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>DM Access</title>
         <style>
-          body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#120f0b;color:#f4e8cf;font-family:"Cinzel","Garamond",serif;}
-          form{background:rgba(12,9,6,0.85);border:1px solid rgba(255,255,255,0.12);padding:24px 28px;border-radius:14px;box-shadow:0 12px 24px rgba(0,0,0,0.45);min-width:280px;}
+          *{box-sizing:border-box;}
+          body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#120f0b;color:#f4e8cf;font-family:"Cinzel","Garamond",serif;}
+          form{background:rgba(12,9,6,0.85);border:1px solid rgba(255,255,255,0.12);padding:28px;border-radius:14px;box-shadow:0 12px 24px rgba(0,0,0,0.45);width:100%;max-width:380px;}
+          h1{margin:0 0 8px;font-size:1.7rem;}p{margin:0 0 24px;line-height:1.5;color:#c9b48b;}
           label{display:block;margin-bottom:8px;letter-spacing:0.12em;text-transform:uppercase;font-size:0.75rem;color:#c9b48b;}
           input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#0b0906;color:#f4e8cf;font-size:1rem;}
           button{margin-top:14px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:#b31212;color:#fbe7e2;font-weight:bold;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;}
+          input:focus-visible,button:focus-visible{outline:2px solid #e6bd6b;outline-offset:3px;}
         </style>
       </head>
       <body>
         <form method="post" action="/dm-auth">
+          <h1>Dungeon Master</h1>
+          <p>Prepare your campaign and guide the adventure.</p>
           <label for="dm-password">DM Password</label>
-          <input id="dm-password" name="password" type="password" autocomplete="current-password" />
+          <input id="dm-password" name="password" type="password" autocomplete="current-password" required autofocus />
           <button type="submit">Enter</button>
         </form>
       </body>

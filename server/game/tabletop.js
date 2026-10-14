@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const MonsterRules = require("../../public/monster-rules");
 const {
   FOV_CACHE_REBUILD_INTERVAL_MS,
   createFovCacheForMap,
@@ -45,10 +46,15 @@ const DEFAULT_DARKVISION_TINT_ALPHA = 0.42;
 const DEFAULT_TOKEN_AURA_COLOR = "#59a8ff";
 const MAX_LIGHT_RADIUS_FEET = 10_000;
 const TOKEN_SIZE_SQUARES = {
+  fine: 1,
+  diminutive: 1,
+  tiny: 1,
+  small: 1,
   medium: 1,
   large: 2,
   huge: 3,
   gargantuan: 4,
+  colossal: 6,
 };
 let activeTextureCatalog = buildTextureCatalog(DEFAULT_TERRAIN_TEXTURE_ROOT);
 
@@ -298,6 +304,10 @@ function normalizeTokenSize(value) {
   }
   if (/gargantuan|garg/.test(normalized)) {
     return "gargantuan";
+  }
+  if (/\bcolossal\b/.test(normalized)) return "colossal";
+  for (const size of ["fine", "diminutive", "tiny", "small"]) {
+    if (new RegExp(`\\b${size}\\b`).test(normalized)) return size;
   }
   if (/\bhuge\b/.test(normalized)) {
     return "huge";
@@ -1111,23 +1121,7 @@ function parseStatblockColumn(rows, columnName) {
   });
 
   const skills = {};
-  [
-    "melee weapons",
-    "ranged weapons",
-    "dodge",
-    "resist condition",
-    "resist will",
-    "resistive willpower",
-    "initiative",
-    "resist damage",
-    "strength",
-    "athletics",
-    "stealth",
-    "endurance",
-    "resist pain",
-    "perception",
-    "beseech the gods",
-  ].forEach((name) => {
+  [...MonsterRules.skills.map((skill) => skill.key), "resist will"].forEach((name) => {
     if (byName[name] !== undefined) {
       skills[name] = normalizeNumber(byName[name], 0);
     }
@@ -1135,7 +1129,7 @@ function parseStatblockColumn(rows, columnName) {
 
   const displayName = statblockDisplayName(rows, index, byName, columnName);
   const rawSize = byName.size !== undefined ? String(byName.size || "").trim() : "";
-  const tokenSize = normalizeTokenSize(rawSize);
+  const tokenSize = normalizeTokenSize(rawSize || MonsterRules.inferSize(byName).size);
   const hp = Math.max(1, normalizeNumber(byName.hp, 1));
   const ac = byName.ac !== undefined ? normalizeNumber(byName.ac, 0) : null;
   const currentValues = {
@@ -1670,7 +1664,7 @@ function parseManualStatblockText(text) {
     currentValues: {},
     currentValueMeta: {},
     parsedAt: nowIso(),
-    tokenSize: normalizeTokenSize(byKey.size),
+    tokenSize: normalizeTokenSize(byKey.size || MonsterRules.inferSize(byKey).size),
     italicizedSkillDc: normalizeNumber(byKey["italicized skill dc"], 0),
     strengthModifier: normalizeNumber(byKey.strength, 0),
     resistDamageBonus: normalizeNumber(byKey["resist damage"], 0),
@@ -1896,14 +1890,15 @@ function resolveTokenHpForEntity(entity, fallbackHp = null) {
     getNumericParsedCurrentValue(parsed, "hp"),
     fallbackMax,
   ];
-  const max = Math.max(1, Math.round(maxCandidates.find((value) => Number.isFinite(Number(value))) || 1));
+  const hasNumber = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+  const max = Math.max(1, Math.round(maxCandidates.find(hasNumber) || 1));
   const currentCandidates = [
     getNumericParsedCurrentValue(parsed, "current hp"),
     getNumericParsedCurrentValue(parsed, "hp"),
     fallbackHp && typeof fallbackHp === "object" ? fallbackHp.current : null,
     max,
   ];
-  const current = currentCandidates.find((value) => Number.isFinite(Number(value)));
+  const current = currentCandidates.find(hasNumber);
   return normalizeTokenHpShape({ current, max }, max);
 }
 
@@ -3649,9 +3644,26 @@ function createTabletopSystem(io, options = {}) {
       broadcastSnapshots();
     });
 
-    socket.on("statblock:save", async (payload) => {
+    socket.on("statblock:save", async (payload, acknowledge) => {
+      const reply = typeof acknowledge === "function" ? acknowledge : () => {};
       if (!requireDm(socket)) {
+        reply({ ok: false, error: "Only the campaign DM can save monsters." });
         return;
+      }
+      if (!payload || typeof payload !== "object") {
+        reply({ ok: false, error: "A statblock is required." });
+        return;
+      }
+      let monster = null;
+      if (payload.mode === "generated") {
+        try {
+          monster = MonsterRules.normalizeMonster(payload.monster);
+          if (!monster.name.trim() || !Number.isFinite(monster.hp) || monster.hp < 1) throw new Error("Set a monster name and hit points of at least 1.");
+          if (MonsterRules.skills.some((skill) => !Number.isFinite(monster.skills[skill.key]))) throw new Error("Set a baseline or custom bonus for all 28 skills.");
+        } catch (error) {
+          reply({ ok: false, error: error.message || "Invalid monster statblock." });
+          return;
+        }
       }
       const campaign = ensureSocketCampaign(socket);
       const existing = campaign.statblocks.find((candidate) => candidate.id === payload.id) || null;
@@ -3667,8 +3679,14 @@ function createTabletopSystem(io, options = {}) {
       target.sheetUrl = String(payload.sheetUrl || "").trim();
       target.sheetName = String(payload.sheetName || "Augmented beasts").trim() || "Augmented beasts";
       target.columnName = String(payload.columnName || "").trim();
-      target.mode = payload.mode === "column" ? "column" : payload.mode === "sheet" ? "sheet" : "manual";
-      target.manualText = String(payload.manualText || "");
+      target.mode = monster ? "generated" : payload.mode === "column" ? "column" : payload.mode === "sheet" ? "sheet" : "manual";
+      target.manualText = monster ? MonsterRules.toManualText(monster) : String(payload.manualText || "");
+      if (monster) {
+        target.monster = monster;
+        target.name = monster.name;
+      } else {
+        delete target.monster;
+      }
       target.updatedAt = nowIso();
 
       try {
@@ -3705,6 +3723,7 @@ function createTabletopSystem(io, options = {}) {
       appendSystemLog(campaign, socket, `DM saved statblock ${target.name}.`);
       persistence.saveSoon();
       broadcastSnapshots();
+      reply({ ok: true, id: target.id });
     });
 
     socket.on("statblock:delete", (payload) => {
